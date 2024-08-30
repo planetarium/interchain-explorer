@@ -29,6 +29,8 @@
     "@nestjs/schedule": "^4.1.0",
     "@nestjs/serve-static": "^4.0.2",
     "@nestjs/typeorm": "^10.0.2",
+    "abi-decoder": "^2.4.0",
+    "ethereum-input-data-decoder": "^0.4.2",
     "ethers": "^6.13.2",
     "mysql2": "^3.11.0",
     "reflect-metadata": "^0.2.0",
