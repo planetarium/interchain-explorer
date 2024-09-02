@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InterChain Explorer</title>
+  <style>
+      body {
+          font-family: Arial, sans-serif;
+          background-color: #f5f5f5;
+          margin: 0;
+          padding: 20px;
+      }
+      .container {
+          max-width: 1200px;
+          margin: 0 auto;
+      }
+      .card-container {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 20px;
+          margin-bottom: 20px;
+      }
+      .card {
+          background-color: #ffffff;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          padding: 20px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          flex: 1 1 calc(50% - 20px);
+      }
+      .card h3 {
+          margin-top: 0;
+          font-size: 18px;
+          color: #333;
+      }
+      .status {
+          padding: 10px;
+          border-radius: 4px;
+          background-color: #e7f3fe;
+          border: 1px solid #b3d4fc;
+          margin-top: 10px;
+          display: none;
+      }
+      .status.success {
+          background-color: #e7ffe7;
+          border-color: #b3fcb3;
+      }
+      .status.error {
+          background-color: #ffe7e7;
+          border-color: #fcb3b3;
+      }
+      .btn {
+          padding: 10px 15px;
+          font-size: 16px;
+          color: #fff;
+          background-color: #007bff;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background-color 0.3s;
+          position: relative;
+      }
+      .btn:hover {
+          background-color: #0056b3;
+      }
+      .loader {
+          display: none;
+          border: 3px solid #f3f3f3;
+          border-top: 3px solid #007bff;
+          border-radius: 50%;
+          width: 16px;
+          height: 16px;
+          animation: spin 1s linear infinite;
+          margin-left: 10px;
+      }
+      @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+      }
+      input[type="text"] {
+          padding: 10px;
+          width: calc(100% - 22px);
+          margin-bottom: 10px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 16px;
+      }
+      .details-container {
+          margin-top: 20px;
+      }
+      .details-container h3 {
+          font-size: 22px;
+          margin-bottom: 10px;
+          color: #333;
+      }
+      .details-card {
+          background-color: #ffffff;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          padding: 20px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .details-card table {
+          width: 100%;
+          border-collapse: collapse;
+      }
+      .details-card th, .details-card td {
+          padding: 12px;
+          border: 1px solid #ddd;
+          text-align: left;
+      }
+      .details-card th {
+          background-color: #f2f2f2;
+          color: #333;
+      }
+      .details-card td {
+          color: #555;
+      }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- BNB Transaction Check -->
+  <div class="card-container">
+    <div class="card">
+      <h3>Show Destination(Mainnet -> BNB) Transactions</h3>
+      <input type="text" id="bnbTxHash" placeholder="Enter Source Transaction Hash" />
+      <button class="btn" id="checkBNBTransactionsBtn" onclick="checkBNBTransactions()">Check Transactions <span id="checkBNBTransactionsLoader" class="loader"></span></button>
+      <div id="bnbTransactionsResult" class="status"></div>
+    </div>
+  </div>
+
+  <!-- Arbitrum Transaction Check -->
+  <div class="card-container">
+    <div class="card">
+      <h3>Show Destination(Mainnet -> Arbitrum) Transactions</h3>
+      <input type="text" id="arbitrumTxHash" placeholder="Enter Source Transaction Hash" />
+      <button class="btn" id="checkArbitrumTransactionsBtn" onclick="checkArbitrumTransactions()">Check Transactions <span id="checkArbitrumTransactionsLoader" class="loader"></span></button>
+      <div id="arbitrumTransactionsResult" class="status"></div>
+    </div>
+  </div>
+
+  <!-- Transaction Details Table -->
+  <div id="transactionDetails" class="details-container" style="display: none;">
+    <h3>Transaction Details</h3>
+    <div class="details-card">
+      <table>
+        <thead>
+        <tr>
+          <th>Field</th>
+          <th>Value</th>
+        </tr>
+        </thead>
+        <tbody id="transactionDetailsBody">
+        <!-- Data rows will be inserted here by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    async function checkBNBTransactions() {
+      const txHash = document.getElementById('bnbTxHash').value;
+      const button = document.getElementById('checkBNBTransactionsBtn');
+      const loader = document.getElementById('checkBNBTransactionsLoader');
+      const resultDiv = document.getElementById('bnbTransactionsResult');
+
+      button.disabled = true;
+      loader.style.display = 'inline-block';
+
+      try {
+        const response = await fetch(`/api/bnb?srcTxHash=${txHash}`);
+        const result = await response.json();
+        // Assuming the response is an array of transactions
+        if (result.length > 0) {
+          // Loop through each transaction and display the details
+          displayMultipleTransactionGroups(result);
+          resultDiv.textContent = 'Transaction details fetched successfully.';
+          resultDiv.className = 'status success';
+        } else {
+          resultDiv.textContent = 'No transaction details found.';
+          resultDiv.className = 'status error';
+        }
+      } catch (error) {
+        resultDiv.textContent = 'Error checking BNB transactions: ' + error.message;
+        resultDiv.className = 'status error';
+      } finally {
+        button.disabled = false;
+        loader.style.display = 'none';
+      }
+    }
+
+    async function checkArbitrumTransactions() {
+      const txHash = document.getElementById('arbitrumTxHash').value;
+      const button = document.getElementById('checkArbitrumTransactionsBtn');
+      const loader = document.getElementById('checkArbitrumTransactionsLoader');
+      const resultDiv = document.getElementById('arbitrumTransactionsResult');
+
+      button.disabled = true;
+      loader.style.display = 'inline-block';
+
+      try {
+        const response = await fetch(`/api/arbitrum?srcTxHash=${txHash}`);
+        const result = await response.json();
+        // Assuming the response is an array of transactions
+        if (result.length > 0) {
+          displayMultipleTransactionGroups(result);
+          resultDiv.textContent = 'Transaction details fetched successfully.';
+          resultDiv.className = 'status success';
+        } else {
+          resultDiv.textContent = 'No transaction details found.';
+          resultDiv.className = 'status error';
+        }
+      } catch (error) {
+        resultDiv.textContent = 'Error checking Arbitrum transactions: ' + error.message;
+        resultDiv.className = 'status error';
+      } finally {
+        button.disabled = false;
+        loader.style.display = 'none';
+      }
+    }
+
+    const explorers = {
+      'BNB': 'https://bscscan.com',
+      'Arbitrum': 'https://arbiscan.io',
+      'mainnet': 'https://etherscan.io'
+      // 필요한 다른 체인과 익스플로러 링크를 여기 추가
+    };
+    const tokenLogos = {
+      'QORPO': 'https://etherscan.io/token/images/qorpo_32.png', // QORPO 로고 URL로 변경하세요.
+      'WETH': 'https://arbiscan.io/token/images/weth_28.png',
+      // 다른 토큰 심볼과 로고를 여기 추가
+    };
+
+    function displayMultipleTransactionGroups(data) {
+      const container = document.getElementById('transactionDetailsBody');
+      container.innerHTML = ''; // 기존 내용을 지웁니다.
+
+      const { sourceTx, destinationTx } = data[0];
+      const transactionGroups = data[0].transactionGroups; // 참조 변수 수정
+
+      transactionGroups.forEach((transactions, groupIndex) => {
+        // 트랜잭션 그룹에 대한 wrapper div 생성
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'transaction-group';
+
+        // 각 그룹에 대한 제목 추가
+        const groupTitle = document.createElement('h2');
+        groupTitle.textContent = `Transaction Group #${groupIndex + 1}`;
+        groupDiv.appendChild(groupTitle);
+
+        transactions.forEach((transaction, index) => {
+          // 각 트랜잭션에 대한 wrapper div 생성
+          const transactionDiv = document.createElement('div');
+          transactionDiv.className = 'transaction';
+
+          // 각 트랜잭션에 대한 제목 추가
+          if (index === 0) {
+            const bridgeTitle = document.createElement('h3');
+            bridgeTitle.textContent = `Bridge Transaction`;
+            bridgeTitle.style.color = '#ff5733'; // 예를 들어, 색상 변경
+            bridgeTitle.style.borderBottom = '2px solid #ff5733'; // 하단에 구분선 추가
+            transactionDiv.appendChild(bridgeTitle);
+
+            // 브릿지 트랜잭션에 대한 스타일링
+            transactionDiv.style.backgroundColor = '#f9f9f9';
+            transactionDiv.style.padding = '10px';
+            transactionDiv.style.borderRadius = '8px';
+
+            // Source와 Destination 정보를 추가로 표시
+            const sourceInfo = document.createElement('p');
+            sourceInfo.innerHTML = `<strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) - <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a>`;
+            transactionDiv.appendChild(sourceInfo);
+
+            const destinationInfo = document.createElement('p');
+            destinationInfo.innerHTML = `<strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) - <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a>`;
+            transactionDiv.appendChild(destinationInfo);
+          } else {
+            const title = document.createElement('h3');
+            title.textContent = `Transaction #${index}`;
+            transactionDiv.appendChild(title);
+          }
+
+          // 트랜잭션 세부 정보를 위한 테이블 생성
+          const table = document.createElement('table');
+          table.className = 'transaction-table';
+
+          const tableBody = document.createElement('tbody');
+          table.appendChild(tableBody);
+
+          const explorerBaseURL = explorers[transaction.chain] || explorers['BNB'];
+
+          // 필드 및 해당 값을 정의
+          const fields = [
+            {
+              label: 'From',
+              value: `<a href="${explorerBaseURL}/address/${transaction.from}" target="_blank">${transaction.from}</a>`
+            },
+            {
+              label: 'To',
+              value: `<a href="${explorerBaseURL}/address/${transaction.to}" target="_blank">${transaction.to}</a>`
+            },
+            {
+              label: 'Value',
+              value: (BigInt(transaction.value) / BigInt(1e18)).toString() + ' ETH'
+            },
+            {
+              label: 'Timestamp',
+              value: new Date(transaction.timeStamp * 1000).toLocaleString()
+            },
+            {
+              label: 'Transaction Hash',
+              value: `<a href="${explorerBaseURL}/tx/${transaction.hash}" target="_blank">${transaction.hash}</a>`
+            },
+            {
+              label: 'Token',
+              value: `<img src="${tokenLogos[transaction.tokenSymbol]}" alt="${transaction.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${transaction.tokenName} (${transaction.tokenSymbol})`
+            }
+          ];
+
+          // 테이블에 행 추가
+          fields.forEach(field => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+          <td>${field.label}</td>
+          <td>${field.value}</td>
+        `;
+            tableBody.appendChild(row);
+          });
+
+          // 테이블을 트랜잭션 div에 추가
+          transactionDiv.appendChild(table);
+
+          // 트랜잭션 div를 그룹 div에 추가
+          groupDiv.appendChild(transactionDiv);
+        });
+
+        // 트랜잭션 그룹 간에 구분자 추가
+        if (groupIndex < transactionGroups.length - 1) {
+          const separator = document.createElement('hr');
+          groupDiv.appendChild(separator);
+        }
+
+        // 그룹 div를 컨테이너에 추가
+        container.appendChild(groupDiv);
+      });
+
+      // 트랜잭션 세부 섹션을 표시
+      document.getElementById('transactionDetails').style.display = 'block';
+    }
+
+
+
+  </script>

@@ -26,17 +26,37 @@ export class ApiController {
     const {messages} = await client.getMessagesBySrcTxHash(
       srcTxHash,
     );
-    const destinationHash = messages.at(0).dstTxHash;
+    const data = await this.getLayerZeroScanInfo(srcTxHash);
+    const destinationHash = data.destination.tx.txHash;
     const destTx = await this.getDestinationTxInBNB(destinationHash);
+    const transactionGroups = [];
     if(destTx) {
       const receivers = await this.findReceiverInLogs(destTx.logs);
       for (const receiverAddress of receivers) {
-        console.log(await this.getTransactionsByAddressInBNB(receiverAddress))
+        const transactions = await this.getTransactionsByAddressInBNB(receiverAddress, String(parseInt(String(destTx.blockNumber), 16)));
+        transactionGroups.push(transactions);
       }
     }
     else {
       console.log("블록 채굴 미완료");
     }
+    const response = [];
+    response.push({ "sourceTx": data.pathway.sender, "destinationTx": data.pathway.receiver, "transactionGroups": transactionGroups });
+    console.log(response);
+    return response;
+  }
+
+  private async getLayerZeroScanInfo(srcTxHash: string) {
+    const url = `https://scan.layerzero-api.com/v1/messages/tx/${srcTxHash}`;
+    const { data } = await firstValueFrom(
+      this.httpService.get(url).pipe(
+        catchError((error: AxiosError) => {
+          console.log("Error fetching transaction history:", error.message);
+          throw new Error("An error occurred while fetching transaction history.");
+        })
+      )
+    );
+    return data.data[0];
   }
 
   @Get('/arbitrum')
@@ -44,15 +64,20 @@ export class ApiController {
     const srcTx = await this.getTxInMainnet(srcTxHash);
     const abi = await this.getABIInMainnet(srcTx);
     const decodedInputData = await this.getDecodedInputData(abi, srcTxHash);
-
+    console.log(srcTx);
     const recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === 'recipient');
     if (recipientIndex === -1) {
       throw new Error('recipient(수취 예정자)가 존재하지 않는 Contract');
     }
     const recipientAddress = decodedInputData.args[recipientIndex]; // 알맞은 recipient를 찾아오는 로직
+    const transactionGroups = [];
     if(recipientAddress) {
-      console.log(await this.getTransactionsByAddressInArbitrum(recipientAddress));
+      const transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress);
+      transactionGroups.push(transactions);
     }
+    const response = [];
+    response.push({"sourceTx":{"address": srcTxHash, "chain": "ethereum"}, "destinationTx": {}, "transactionGroups": transactionGroups});
+    return response;
   }
 
   private async getDecodedInputData(abi, srcTxHash: string) {
@@ -123,8 +148,9 @@ export class ApiController {
     return receivers;
   }
 
-  private async getTransactionsByAddressInBNB(address: string) {
-    const url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=desc&startblock=0&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
+  private async getTransactionsByAddressInBNB(address: string, blockNumber: string) {
+    address = address.replace(/^0x0+/, "0x");
+    const url = `https://api.bscscan.com/api?module=account&action=tokentx&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
@@ -133,14 +159,16 @@ export class ApiController {
         })
       )
     );
+    for (const tx of data.result)
+      tx.chain = "BNB"; //구분을 위한 체인명 삽입
 
     if (data.message == "OK") {
-      console.log(data);
+      return data.result;
     }
   }
 
   private async getTransactionsByAddressInArbitrum(address: string) {
-    const url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=desc&startblock=0&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
+    const url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=desc&startblock=0&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
@@ -150,9 +178,12 @@ export class ApiController {
       )
     );
 
-    if(data.message != "OK") {
-      throw new Error("Arbiscan API 오류");
+    for (const tx of data.result)
+      tx.chain = "Arbitrum"; //구분을 위한 체인명 삽입
+    if(data.message == "OK") {
+      return data.result;
     }
+
     return data.result;
   }
 
