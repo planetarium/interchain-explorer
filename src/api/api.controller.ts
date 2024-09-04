@@ -22,27 +22,45 @@ export class ApiController {
 
   @Get('/bnb') // LayerZero Protocol (OFTP
   async getBNBAccountTx(@Query('srcTxHash') srcTxHash: string) {
-    const client = createClient('mainnet');
-    const {messages} = await client.getMessagesBySrcTxHash(
-      srcTxHash,
-    );
-    const data = await this.getLayerZeroScanInfo(srcTxHash);
-    const destinationHash = data.destination.tx.txHash;
-    const destTx = await this.getDestinationTxInBNB(destinationHash);
-    const transactionGroups = [];
-    if(destTx) {
-      const receivers = await this.findReceiverInLogs(destTx.logs);
-      for (const receiverAddress of receivers) {
-        const transactions = await this.getTransactionsByAddressInBNB(receiverAddress, String(parseInt(String(destTx.blockNumber), 16)));
-        transactionGroups.push(transactions);
-        console.log(transactions);
+    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const from = layerData.source.tx.from;
+    const abi = await this.getABIInMainnet(srcTx);
+    const decodedInputData = await this.getDecodedInputData(abi, srcTxHash);
+    const recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === '_toAddress');
+    const recipientAddress = "0x" + decodedInputData.args[recipientIndex].slice(-40);
+
+    console.log(recipientAddress);
+
+    let srcAmount;
+    let dstAmount;
+    if(srcTx) {
+      const logs = await this.getLogsInSource(from, srcTx.logs);
+      for (const log of logs) {
+        srcAmount += (BigInt(log.data) / BigInt(1e18)).toString();
       }
+    }
+    const destTx = await this.getTxInBNB(layerData.destination.tx.txHash);
+
+    const transactionGroups = [];
+    let logs;
+    if(destTx) {
+      logs = await this.getLogsInDestination(recipientAddress, destTx.logs);
+      for (const log of logs) {
+        dstAmount += (BigInt(log.data) / BigInt(1e18)).toString();
+      }
+      const transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(parseInt(String(destTx.blockNumber), 16)));
+      transactionGroups.push(transactions);
     }
     else {
       console.log("블록 채굴 미완료");
     }
     const response = [];
-    response.push({ "sourceTx": data.pathway.sender, "destinationTx": data.pathway.receiver, "transactionGroups": transactionGroups });
+    layerData.pathway.sender.address = layerData.source.tx.from;
+    layerData.pathway.sender.value = srcAmount;
+    layerData.pathway.receiver.address = recipientAddress;
+    layerData.pathway.receiver.value = dstAmount;
+    response.push({ "sourceTx": layerData.pathway.sender, "destinationTx": layerData.pathway.receiver, "transactionGroups": transactionGroups });
     console.log(response);
     return response;
   }
@@ -102,10 +120,10 @@ export class ApiController {
     return abi;
   }
 
-  private async getTxInMainnet(txHash: string) {
+  private async getTxInMainnet(txHash: string): Promise<null | TransactionReceipt>{
     const requestBody = {
       jsonrpc: "2.0",
-      method: "eth_getTransactionByHash",
+      method: "eth_getTransactionReceipt",
       params: [`${txHash}`],
       id: 1
     };
@@ -120,7 +138,8 @@ export class ApiController {
     return data.result;
   }
 
-  private async getDestinationTxInBNB(txHash: string) : Promise<null | TransactionReceipt>{
+
+  private async getTxInBNB(txHash: string) : Promise<null | TransactionReceipt>{
     const requestBody = {
       jsonrpc: "2.0",
       method: "eth_getTransactionReceipt",
@@ -138,20 +157,25 @@ export class ApiController {
     return data.result;
   }
 
-  private async findReceiverInLogs(logs) {
+  private async getLogsInSource(address, logs) {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    console.log(address);
+    const filteredLogs = logs
+      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[1].slice(-40) === address);
+    return filteredLogs;
+  }
 
-    const receivers = logs
-      .filter(log => log.topics[0] === transferCode)  // topic[0]이 일치하는 로그만 필터링
-      .map(log => log.topics[2]);  // 각 필터된 로그에서 receiver를 추출하자!
-
-    return receivers;
+  private async getLogsInDestination(address, logs) {
+    const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    console.log(logs);
+    const filteredLogs = logs
+      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[2].slice(-40) === address);
+    return filteredLogs;
   }
 
   private async getTransactionsByAddressInBNB(address: string, blockNumber: string) {
     if(address.length > 40)
       address = "0x" + address.slice(-40);
-    console.log(address);
     const url = `https://api.bscscan.com/api?module=account&action=tokentx&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
