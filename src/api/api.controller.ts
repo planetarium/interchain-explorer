@@ -20,7 +20,7 @@ export class ApiController {
               private readonly configService: ConfigService,
               private readonly httpService: HttpService) {}
 
-  @Get('/bnb')
+  @Get('/bnb') // LayerZero Protocol (OFTP
   async getBNBAccountTx(@Query('srcTxHash') srcTxHash: string) {
     const client = createClient('mainnet');
     const {messages} = await client.getMessagesBySrcTxHash(
@@ -35,6 +35,7 @@ export class ApiController {
       for (const receiverAddress of receivers) {
         const transactions = await this.getTransactionsByAddressInBNB(receiverAddress, String(parseInt(String(destTx.blockNumber), 16)));
         transactionGroups.push(transactions);
+        console.log(transactions);
       }
     }
     else {
@@ -59,7 +60,7 @@ export class ApiController {
     return data.data[0];
   }
 
-  @Get('/arbitrum')
+  @Get('/arbitrum') // Across Protocol
   async getArbitrumAccountTx(@Query('srcTxHash') srcTxHash: string) {
     const srcTx = await this.getTxInMainnet(srcTxHash);
     const abi = await this.getABIInMainnet(srcTx);
@@ -144,12 +145,13 @@ export class ApiController {
       .filter(log => log.topics[0] === transferCode)  // topic[0]이 일치하는 로그만 필터링
       .map(log => log.topics[2]);  // 각 필터된 로그에서 receiver를 추출하자!
 
-    console.log(receivers);  // results는 조건을 만족하는 모든 topic[2] 값의 배열
     return receivers;
   }
 
   private async getTransactionsByAddressInBNB(address: string, blockNumber: string) {
-    address = address.replace(/^0x0+/, "0x");
+    if(address.length > 40)
+      address = "0x" + address.slice(-40);
+    console.log(address);
     const url = `https://api.bscscan.com/api?module=account&action=tokentx&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
@@ -161,9 +163,11 @@ export class ApiController {
     );
     for (const tx of data.result)
       tx.chain = "BNB"; //구분을 위한 체인명 삽입
-
     if (data.message == "OK") {
       return data.result;
+    }
+    else {
+      console.log(data.message);
     }
   }
 
