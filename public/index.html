@@ -230,7 +230,7 @@
       // 필요한 다른 체인과 익스플로러 링크를 여기 추가
     };
     const tokenLogos = {
-      'QORPO': 'https://etherscan.io/token/images/qorpo_32.png', // QORPO 로고 URL로 변경하세요.
+      'QORPO': 'https://etherscan.io/token/images/qorpo_32.png',
       'WETH': 'https://arbiscan.io/token/images/weth_28.png',
       'WNCG': 'https://etherscan.io/token/images/wrappedncg_32.png?=v37',
       'MGP': 'https://bscscan.com/token/images/magpie_32.png'
@@ -272,13 +272,32 @@
             transactionDiv.style.padding = '10px';
             transactionDiv.style.borderRadius = '8px';
 
-            // Source와 Destination 정보를 추가로 표시
+            const defaultLogoUrl = 'path/to/default/logo.png';
+
+// 이미지 요소 생성 함수
+            function createTokenImage(tokenId) {
+              const img = document.createElement('img');
+              img.src = tokenLogos[tokenId] || defaultLogoUrl;
+              img.alt = `${tokenId} logo`;
+              img.width = 20;  // 적절한 크기로 조정
+              img.height = 20;
+              img.onerror = function() {
+                this.onerror = null;
+                this.src = defaultLogoUrl;
+              };
+              return img;
+            }
+
+// 소스 정보 생성
             const sourceInfo = document.createElement('p');
             sourceInfo.innerHTML = `<strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) - <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a>`;
+            sourceInfo.prepend(createTokenImage(sourceTx.id));
             transactionDiv.appendChild(sourceInfo);
 
+// 목적지 정보 생성
             const destinationInfo = document.createElement('p');
             destinationInfo.innerHTML = `<strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) - <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a>`;
+            destinationInfo.insertBefore(createTokenImage(destinationTx.id), destinationInfo.firstChild);
             transactionDiv.appendChild(destinationInfo);
           } else {
             const title = document.createElement('h3');

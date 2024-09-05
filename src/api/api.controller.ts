@@ -1,10 +1,10 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiService } from "./api.service";
-import { ethers, InfuraProvider, TransactionReceipt } from "ethers";
+import { Contract, ethers, InfuraProvider, TransactionReceipt } from "ethers";
 import { ConfigService } from "@nestjs/config";
 import { AxiosError } from "axios";
 import { createClient } from '@layerzerolabs/scan-client';
-import { catchError, firstValueFrom } from "rxjs";
+import { catchError, firstValueFrom, timestamp } from "rxjs";
 import { HttpService } from "@nestjs/axios";
 
 @Controller('/api')
@@ -25,9 +25,12 @@ export class ApiController {
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
     const srcTx = await this.getTxInMainnet(srcTxHash);
     const from = layerData.source.tx.from;
-    const abi = await this.getABIInMainnet(srcTx);
+    const abi = await this.getTxABIInMainnet(srcTx);
     const decodedInputData = await this.getDecodedInputData(abi, srcTxHash);
-    const recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === '_toAddress');
+    console.log(decodedInputData.fragment.inputs);
+    console.log(decodedInputData.fragment.inputs.at(0).components);
+
+    let recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === '_toAddress');
     const recipientAddress = "0x" + decodedInputData.args[recipientIndex].slice(-40);
 
     console.log(recipientAddress);
@@ -81,21 +84,43 @@ export class ApiController {
   @Get('/arbitrum') // Across Protocol
   async getArbitrumAccountTx(@Query('srcTxHash') srcTxHash: string) {
     const srcTx = await this.getTxInMainnet(srcTxHash);
-    const abi = await this.getABIInMainnet(srcTx);
-    const decodedInputData = await this.getDecodedInputData(abi, srcTxHash);
-    console.log(srcTx);
-    const recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === 'recipient');
-    if (recipientIndex === -1) {
+
+    const log = srcTx.logs.find(log => log.address === '0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5'); // Across Protocol
+    const decodedLogData = await this.getDecodedLogs(log);
+    console.log(decodedLogData.fragment.inputs);
+    console.log(decodedLogData);
+    const tokenIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'inputToken');
+    const inputAmountIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'inputAmount');
+    const outputAmountIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'outputAmount');
+    const token = String(decodedLogData.args[tokenIdx]);
+    const inputAmount = BigInt(decodedLogData.args[inputAmountIdx]);
+    const outputAmount = BigInt(decodedLogData.args[outputAmountIdx]);
+
+    const blockData = await this.mainnetProvider.getBlock(srcTx.blockNumber);
+    const timeStamp = String(blockData.timestamp);
+    const depositorIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'depositor');
+    const recipientIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'recipient');
+    if (recipientIdx === -1) {
       throw new Error('recipient(수취 예정자)가 존재하지 않는 Contract');
     }
-    const recipientAddress = decodedInputData.args[recipientIndex]; // 알맞은 recipient를 찾아오는 로직
+    const depositorAddress = decodedLogData.args[depositorIdx]; // 알맞은 recipient를 찾아오는 로직
+    const recipientAddress = decodedLogData.args[recipientIdx]; // 알맞은 recipient를 찾아오는 로직
     const transactionGroups = [];
     if(recipientAddress) {
-      const transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress);
+      const blockNumber = await this.getBlockNumberByTimeStamp(timeStamp);
+      const transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress, blockNumber);
       transactionGroups.push(transactions);
+      console.log(transactions);
     }
     const response = [];
-    response.push({"sourceTx":{"address": srcTxHash, "chain": "ethereum"}, "destinationTx": {}, "transactionGroups": transactionGroups});
+    const tokenContract = new Contract(token, ["function name() view returns (string)", "function symbol() view returns (string)"], this.mainnetProvider);
+    const tokenName = await tokenContract.name();
+    const tokenSymbol = await tokenContract.symbol();
+    const sourceTx = {"address":depositorAddress, "id": tokenSymbol, "name":tokenName, "chain": "Ethereum", "value": inputAmount.toString()};
+    const destinationTx = {"address":recipientAddress, "id": tokenSymbol, "name":tokenName, "chain": "BNB Chain", "value": outputAmount.toString()};
+
+    response.push({"sourceTx":sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups});
+    console.log(response);
     return response;
   }
 
@@ -106,7 +131,15 @@ export class ApiController {
     return decodedInputData;
   }
 
-  private async getABIInMainnet(srcTx) {
+  private async getDecodedLogs(log) {
+    const acrossProtocolAbi = [
+      "event V3FundsDeposited(address inputToken, address outputToken, uint256 inputAmount, uint256 outputAmount, uint256 indexed destinationChainId, uint32 indexed depositId, uint32 quoteTimestamp, uint32 fillDeadline, uint32 exclusivityDeadline, address indexed depositor, address recipient, address exclusiveRelayer, bytes message)"
+    ];
+    const decoder = new ethers.Interface(acrossProtocolAbi);
+    return decoder.parseLog({ topics: log.topics, data: log.data});
+  }
+
+  private async getTxABIInMainnet(srcTx) {
     const url = `https://api.etherscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("MAINNET_API_KEY")}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
@@ -194,9 +227,23 @@ export class ApiController {
       console.log(data.message);
     }
   }
+  private async getBlockNumberByTimeStamp(timeStamp: string) {
+    const url = `https://api.arbiscan.io/api?module=block&action=getblocknobytime&timestamp=${timeStamp}&closest=after&apikey=YourApiKeyToken`
+    const { data } = await firstValueFrom(
+      this.httpService.get(url).pipe(
+        catchError((error: AxiosError) => {
+          console.log("Error fetching transaction history:", error.message);
+          throw new Error("An error occurred while fetching account transaction history.");
+        })
+      )
+    );
+    if(data.message == "OK")
+      return data.result;
 
-  private async getTransactionsByAddressInArbitrum(address: string) {
-    const url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=desc&startblock=0&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
+    return "0";
+  }
+  private async getTransactionsByAddressInArbitrum(address: string, blockNumber: string) {
+    const url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=desc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
@@ -212,7 +259,7 @@ export class ApiController {
       return data.result;
     }
 
-    return data.result;
+    return "";
   }
 
   @Get('/status/mainnet')
