@@ -224,16 +224,18 @@
     }
 
     const explorers = {
-      'BNB': 'https://bscscan.com',
+      'BNB Chain': 'https://bscscan.com',
       'Arbitrum': 'https://arbiscan.io',
-      'mainnet': 'https://etherscan.io'
+      'Ethereum': 'https://etherscan.io'
       // 필요한 다른 체인과 익스플로러 링크를 여기 추가
     };
     const tokenLogos = {
       'QORPO': 'https://etherscan.io/token/images/qorpo_32.png',
       'WETH': 'https://arbiscan.io/token/images/weth_28.png',
       'WNCG': 'https://etherscan.io/token/images/wrappedncg_32.png?=v37',
-      'MGP': 'https://bscscan.com/token/images/magpie_32.png'
+      'MGP': 'https://bscscan.com/token/images/magpie_32.png',
+      'BSC-USD': 'https://bscscan.com/token/images/busdt_32.png',
+      'GHX': 'https://bscscan.com/token/images/gamercoin_32.png'
       // 다른 토큰 심볼과 로고를 여기 추가
     };
 
@@ -259,6 +261,7 @@
           const transactionDiv = document.createElement('div');
           transactionDiv.className = 'transaction';
 
+          const explorerBaseURL = explorers[transaction.chain] || explorers['BNB'];
           // 각 트랜잭션에 대한 제목 추가
           if (index === 0) {
             const bridgeTitle = document.createElement('h3');
@@ -312,7 +315,6 @@
           const tableBody = document.createElement('tbody');
           table.appendChild(tableBody);
 
-          const explorerBaseURL = explorers[transaction.chain] || explorers['BNB'];
 
           // 필드 및 해당 값을 정의
           const fields = [
@@ -326,7 +328,7 @@
             },
             {
               label: 'Value',
-              value: (BigInt(transaction.value) / BigInt(1e18)).toString() + ' ETH'
+              value: (BigInt(transaction.value) / BigInt(1e18)).toString() + ' ' + transaction.tokenSymbol
             },
             {
               label: 'Timestamp',

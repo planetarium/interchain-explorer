@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiService } from "./api.service";
-import { Contract, ethers, InfuraProvider, TransactionReceipt } from "ethers";
+import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, TransactionReceipt } from "ethers";
 import { ConfigService } from "@nestjs/config";
 import { AxiosError } from "axios";
 import { createClient } from '@layerzerolabs/scan-client';
@@ -10,7 +10,8 @@ import { HttpService } from "@nestjs/axios";
 @Controller('/api')
 export class ApiController {
   private mainnetProvider = new InfuraProvider("mainnet", this.configService.get('INFURA_API_KEY'));
-  private bnbProvider = new InfuraProvider('bnb', this.configService.get('INFURA_API_KEY'));
+  // private bnbProvider = new InfuraProvider('bnb', this.configService.get('INFURA_API_KEY'));
+  private bnbProvider = new EtherscanProvider('bnb', this.configService.get('BNBSCAN_API_KEY'));
   private arbitrumProvider = new InfuraProvider('arbitrum', this.configService.get('INFURA_API_KEY'));
   private mainnetUrl = `https://mainnet.infura.io/v3/${this.configService.get('INFURA_API_KEY')}`;
   private bnbUrl = `https://bsc-mainnet.infura.io/v3/${this.configService.get('INFURA_API_KEY')}`;
@@ -24,46 +25,30 @@ export class ApiController {
   async getBNBAccountTx(@Query('srcTxHash') srcTxHash: string) {
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
     const srcTx = await this.getTxInMainnet(srcTxHash);
-    const from = layerData.source.tx.from;
+    const depositorAddress = layerData.source.tx.from;
     const abi = await this.getTxABIInMainnet(srcTx);
     const decodedInputData = await this.getDecodedInputData(abi, srcTxHash);
-    console.log(decodedInputData.fragment.inputs);
-    console.log(decodedInputData.fragment.inputs.at(0).components);
+
+    const inputAmountIdx= decodedInputData.fragment.inputs.findIndex(param => param.name === '_amount');
+    const inputAmount = BigInt(decodedInputData.args[inputAmountIdx]);
+    const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
+    const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
+    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Ethereum", "value": inputAmount.toString()};
+
 
     let recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === '_toAddress');
     const recipientAddress = "0x" + decodedInputData.args[recipientIndex].slice(-40);
-
-    console.log(recipientAddress);
-
-    let srcAmount;
-    let dstAmount;
-    if(srcTx) {
-      const logs = await this.getLogsInSource(from, srcTx.logs);
-      for (const log of logs) {
-        srcAmount += (BigInt(log.data) / BigInt(1e18)).toString();
-      }
-    }
-    const destTx = await this.getTxInBNB(layerData.destination.tx.txHash);
-
+    const destTx = await this.bnbProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
+    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, this.bnbProvider);
+    const outputAmount = BigInt(parseInt(destinationLogs.data,16));
+    const destinationTx = {"address":recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": "BNB Chain", "value": outputAmount.toString()};
     const transactionGroups = [];
-    let logs;
-    if(destTx) {
-      logs = await this.getLogsInDestination(recipientAddress, destTx.logs);
-      for (const log of logs) {
-        dstAmount += (BigInt(log.data) / BigInt(1e18)).toString();
-      }
-      const transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(parseInt(String(destTx.blockNumber), 16)));
-      transactionGroups.push(transactions);
-    }
-    else {
-      console.log("블록 채굴 미완료");
-    }
+    const transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+    transactionGroups.push(transactions);
+    console.log(transactions);
     const response = [];
-    layerData.pathway.sender.address = layerData.source.tx.from;
-    layerData.pathway.sender.value = srcAmount;
-    layerData.pathway.receiver.address = recipientAddress;
-    layerData.pathway.receiver.value = dstAmount;
-    response.push({ "sourceTx": layerData.pathway.sender, "destinationTx": layerData.pathway.receiver, "transactionGroups": transactionGroups });
+    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
     console.log(response);
     return response;
   }
@@ -92,7 +77,7 @@ export class ApiController {
     const tokenIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'inputToken');
     const inputAmountIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'inputAmount');
     const outputAmountIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'outputAmount');
-    const token = String(decodedLogData.args[tokenIdx]);
+    const tokenAddress = String(decodedLogData.args[tokenIdx]);
     const inputAmount = BigInt(decodedLogData.args[inputAmountIdx]);
     const outputAmount = BigInt(decodedLogData.args[outputAmountIdx]);
 
@@ -113,15 +98,20 @@ export class ApiController {
       console.log(transactions);
     }
     const response = [];
-    const tokenContract = new Contract(token, ["function name() view returns (string)", "function symbol() view returns (string)"], this.mainnetProvider);
-    const tokenName = await tokenContract.name();
-    const tokenSymbol = await tokenContract.symbol();
+    const { tokenName, tokenSymbol } = await this.getTokenInfo(tokenAddress, this.mainnetProvider);
     const sourceTx = {"address":depositorAddress, "id": tokenSymbol, "name":tokenName, "chain": "Ethereum", "value": inputAmount.toString()};
-    const destinationTx = {"address":recipientAddress, "id": tokenSymbol, "name":tokenName, "chain": "BNB Chain", "value": outputAmount.toString()};
+    const destinationTx = {"address":recipientAddress, "id": tokenSymbol, "name":tokenName, "chain": "Arbitrum", "value": outputAmount.toString()};
 
     response.push({"sourceTx":sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups});
-    console.log(response);
+    console.log(response['transactionGroups']);
     return response;
+  }
+
+  private async getTokenInfo(tokenAddress: string, provider: Provider) {
+    const tokenContract = new Contract(tokenAddress, ["function name() view returns (string)", "function symbol() view returns (string)"], provider);
+    const tokenName = await tokenContract.name();
+    const tokenSymbol = await tokenContract.symbol();
+    return { tokenName, tokenSymbol };
   }
 
   private async getDecodedInputData(abi, srcTxHash: string) {
@@ -190,20 +180,18 @@ export class ApiController {
     return data.result;
   }
 
-  private async getLogsInSource(address, logs) {
+  private async getTransferLogsInSource(address, logs) {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-    console.log(address);
-    const filteredLogs = logs
+    const filteredLog = logs
       .filter(log => log.topics[0] === transferCode && '0x' + log.topics[1].slice(-40) === address);
-    return filteredLogs;
+    return filteredLog[0];
   }
 
-  private async getLogsInDestination(address, logs) {
+  private async getTransferLogsInDestination(address, logs) {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-    console.log(logs);
-    const filteredLogs = logs
+    const filteredLog = logs
       .filter(log => log.topics[0] === transferCode && '0x' + log.topics[2].slice(-40) === address);
-    return filteredLogs;
+    return filteredLog[0];
   }
 
   private async getTransactionsByAddressInBNB(address: string, blockNumber: string) {
