@@ -29,15 +29,34 @@ export class ApiController {
     const abi = await this.getTxABIInMainnet(srcTx);
     const decodedInputData = await this.getDecodedInputData(abi, srcTxHash);
 
-    const inputAmountIdx= decodedInputData.fragment.inputs.findIndex(param => param.name === '_amount');
-    const inputAmount = BigInt(decodedInputData.args[inputAmountIdx]);
+
+    console.log(decodedInputData.args);
+    //ProxyOFT일경우
+    let inputAmountIdx= decodedInputData.fragment.inputs.findIndex(param => param.name === '_amount');
+    let inputAmount;
+    if(inputAmountIdx == -1) { // OFT일경우
+      const OFTData = decodedInputData.fragment.inputs.find(param => param.name === '_sendParam');
+      inputAmountIdx = OFTData.components.findIndex(param => param.name === 'amountLD');
+      inputAmount = BigInt(decodedInputData.args.at(0)[inputAmountIdx]);
+    }
+    else {
+      inputAmount = BigInt(decodedInputData.args[inputAmountIdx]);
+    }
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
     const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
     const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Ethereum", "value": inputAmount.toString()};
 
 
     let recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === '_toAddress');
-    const recipientAddress = "0x" + decodedInputData.args[recipientIndex].slice(-40);
+    let recipientAddress;
+    if(recipientIndex == -1) {
+      const OFTData = decodedInputData.fragment.inputs.find(param => param.name === '_sendParam');
+      recipientIndex = OFTData.components.findIndex(param => param.name === 'to');
+      recipientAddress = "0x" + decodedInputData.args.at(0)[recipientIndex].slice(-40);
+    }
+    else {
+      recipientAddress = "0x" + decodedInputData.args[recipientIndex].slice(-40);
+    }
     const destTx = await this.bnbProvider.getTransactionReceipt(layerData.destination.tx.txHash);
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
     const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, this.bnbProvider);
@@ -72,8 +91,6 @@ export class ApiController {
 
     const log = srcTx.logs.find(log => log.address === '0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5'); // Across Protocol
     const decodedLogData = await this.getDecodedLogs(log);
-    console.log(decodedLogData.fragment.inputs);
-    console.log(decodedLogData);
     const tokenIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'inputToken');
     const inputAmountIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'inputAmount');
     const outputAmountIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'outputAmount');
