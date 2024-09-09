@@ -27,36 +27,43 @@ export class ApiController {
     const srcTx = await this.getTxInMainnet(srcTxHash);
     const depositorAddress = layerData.source.tx.from;
     const abi = await this.getTxABIInMainnet(srcTx);
+
     const decodedInputData = await this.getDecodedInputData(abi, srcTxHash);
-
-
-    console.log(decodedInputData.args);
-    //ProxyOFT일경우
-    let inputAmountIdx= decodedInputData.fragment.inputs.findIndex(param => param.name === '_amount');
+    /** ProxyOFT일경우 logs -> params 조회**/
+    let inputAmountIdx = decodedInputData.fragment.inputs.findIndex(param => param.name === "_amount");
     let inputAmount;
-    if(inputAmountIdx == -1) { // OFT일경우
+    if(inputAmountIdx == -1) { /** OFT일경우 logs -> components 조회**/
       const OFTData = decodedInputData.fragment.inputs.find(param => param.name === '_sendParam');
       inputAmountIdx = OFTData.components.findIndex(param => param.name === 'amountLD');
+      if(inputAmountIdx == -1) { /** OKX Proxy일경우 logs -> components 조회**/
+        const ProxyData = decodedInputData.fragment.inputs.find(param => param.name === '_request');
+        inputAmountIdx = ProxyData.components.findIndex(param => param.name === 'amount');
+      }
       inputAmount = BigInt(decodedInputData.args.at(0)[inputAmountIdx]);
     }
     else {
       inputAmount = BigInt(decodedInputData.args[inputAmountIdx]);
     }
+
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
     const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
     const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Ethereum", "value": inputAmount.toString()};
-
 
     let recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === '_toAddress');
     let recipientAddress;
     if(recipientIndex == -1) {
       const OFTData = decodedInputData.fragment.inputs.find(param => param.name === '_sendParam');
       recipientIndex = OFTData.components.findIndex(param => param.name === 'to');
+      if(inputAmountIdx == -1) { /** OKX Proxy일경우 logs -> components 조회**/
+        const ProxyData = decodedInputData.fragment.inputs.find(param => param.name === '_request');
+        recipientIndex = ProxyData.components.findIndex(param => param.name === 'to');
+      }
       recipientAddress = "0x" + decodedInputData.args.at(0)[recipientIndex].slice(-40);
     }
     else {
       recipientAddress = "0x" + decodedInputData.args[recipientIndex].slice(-40);
     }
+
     const destTx = await this.bnbProvider.getTransactionReceipt(layerData.destination.tx.txHash);
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
     const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, this.bnbProvider);
@@ -65,10 +72,8 @@ export class ApiController {
     const transactionGroups = [];
     const transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(destTx.blockNumber));
     transactionGroups.push(transactions);
-    console.log(transactions);
     const response = [];
     response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
-    console.log(response);
     return response;
   }
 
@@ -105,14 +110,13 @@ export class ApiController {
     if (recipientIdx === -1) {
       throw new Error('recipient(수취 예정자)가 존재하지 않는 Contract');
     }
-    const depositorAddress = decodedLogData.args[depositorIdx]; // 알맞은 recipient를 찾아오는 로직
+    const depositorAddress = decodedLogData.args[depositorIdx]; // 알맞은 depositor를 찾아오는 로직
     const recipientAddress = decodedLogData.args[recipientIdx]; // 알맞은 recipient를 찾아오는 로직
     const transactionGroups = [];
     if(recipientAddress) {
       const blockNumber = await this.getBlockNumberByTimeStamp(timeStamp);
       const transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress, blockNumber);
       transactionGroups.push(transactions);
-      console.log(transactions);
     }
     const response = [];
     const { tokenName, tokenSymbol } = await this.getTokenInfo(tokenAddress, this.mainnetProvider);
@@ -120,7 +124,7 @@ export class ApiController {
     const destinationTx = {"address":recipientAddress, "id": tokenSymbol, "name":tokenName, "chain": "Arbitrum", "value": outputAmount.toString()};
 
     response.push({"sourceTx":sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups});
-    console.log(response['transactionGroups']);
+    console.log(response);
     return response;
   }
 

@@ -290,16 +290,17 @@
               };
               return img;
             }
-
+            const sourceValue = (Number(sourceTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
+            const destinationValue = (Number(destinationTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
 // 소스 정보 생성
             const sourceInfo = document.createElement('p');
-            sourceInfo.innerHTML = `<strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) - <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a>`;
+            sourceInfo.innerHTML = `<strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) - <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a> - Value: ${sourceValue} ETH` ;
             sourceInfo.prepend(createTokenImage(sourceTx.id));
             transactionDiv.appendChild(sourceInfo);
 
 // 목적지 정보 생성
             const destinationInfo = document.createElement('p');
-            destinationInfo.innerHTML = `<strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) - <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a>`;
+            destinationInfo.innerHTML = `<strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) - <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a> - Value: ${destinationValue} ETH`;
             destinationInfo.insertBefore(createTokenImage(destinationTx.id), destinationInfo.firstChild);
             transactionDiv.appendChild(destinationInfo);
           } else {
@@ -328,7 +329,7 @@
             },
             {
               label: 'Value',
-              value: (BigInt(transaction.value) / BigInt(1e18)).toString() + ' ' + transaction.tokenSymbol
+              value: (BigInt(transaction.value) / BigInt(1e18)).toString() + ' Token'
             },
             {
               label: 'Timestamp',
