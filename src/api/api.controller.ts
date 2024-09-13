@@ -92,21 +92,70 @@ export class ApiController {
 
   @Get('/drive') // LayerZero Protocol (Drive Bus)
   async getDriveBusAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
-    let provider: Provider
+    let destinationProvider: Provider
     if(chain === "BNB")
-      provider = this.bnbProvider;
+      destinationProvider = this.bnbProvider;
     else if(chain === "Arbitrum")
-      provider = this.arbitrumProvider;
+      destinationProvider = this.arbitrumProvider;
 
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
 
     const depositorAddress = layerData.source.tx.from;
     const sourceTx = {"address": depositorAddress, "id": "X", "name": "X", "chain": "Mainnet", "value": "0"};
 
-    const destTx = await provider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
     const destinationLogs = await this.getTransferLogsInDestination("", destTx.logs);
     const recipientAddress = '0x' + destinationLogs.topics[2].slice(-40);
-    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, provider);
+    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
+    const outputAmount = BigInt(parseInt(destinationLogs.data,16));
+    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+
+    const transactionGroups = [];
+    let transactions;
+    if(chain === 'BNB')
+      transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+    else if(chain === "Arbitrum")
+      transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+
+    transactionGroups.push(transactions);
+    const response = [];
+    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
+
+    console.log(response);
+    return response;
+  }
+
+  @Get('/lifi') // LayerZero Protocol (Li-Fi)
+  async getLifiAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
+    let sourceProvider: Provider
+    let destinationProvider: Provider
+    if(chain === "BNB") {
+      sourceProvider = this.mainnetProvider;
+      destinationProvider = this.bnbProvider;
+    }
+    else if(chain === "Arbitrum") {
+      sourceProvider = this.mainnetProvider;
+      destinationProvider = this.arbitrumProvider;
+    }
+
+
+    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+    const srcTx = await this.getTxInMainnet(srcTxHash);
+
+    const depositorAddress = layerData.source.tx.from;
+    const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
+    const inputAmount = BigInt(parseInt(sourceLogs.data,16));
+    const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, sourceProvider);
+    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name": sourceTokenName, "chain": "Mainnet", "value": inputAmount.toString()};
+
+    const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+
+    const LifiLogs = await this.getLiFiLogsInDestination(destTx.logs);
+    const decodedLogData = await this.getDecodedLogsForLifi(LifiLogs)
+    const recipientIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'to');
+    const recipientAddress = "0x" + decodedLogData.args[recipientIdx].slice(-40);
+    const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
+    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
     const outputAmount = BigInt(parseInt(destinationLogs.data,16));
     const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": chain, "value": outputAmount.toString()};
 
@@ -130,7 +179,7 @@ export class ApiController {
     const srcTx = await this.getTxInMainnet(srcTxHash);
 
     const log = srcTx.logs.find(log => log.address === '0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5'); // Across Protocol
-    const decodedLogData = await this.getDecodedLogs(log);
+    const decodedLogData = await this.getDecodedLogsForAcrossProtocol(log);
     const tokenIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'inputToken');
     const inputAmountIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'inputAmount');
     const outputAmountIdx = decodedLogData.fragment.inputs.findIndex(param => param.name === 'outputAmount');
@@ -177,11 +226,19 @@ export class ApiController {
     return decodedInputData;
   }
 
-  private async getDecodedLogs(log) {
+  private async getDecodedLogsForAcrossProtocol(log) {
     const acrossProtocolAbi = [
       "event V3FundsDeposited(address inputToken, address outputToken, uint256 inputAmount, uint256 outputAmount, uint256 indexed destinationChainId, uint32 indexed depositId, uint32 quoteTimestamp, uint32 fillDeadline, uint32 exclusivityDeadline, address indexed depositor, address recipient, address exclusiveRelayer, bytes message)"
     ];
     const decoder = new ethers.Interface(acrossProtocolAbi);
+    return decoder.parseLog({ topics: log.topics, data: log.data});
+  }
+
+  private async getDecodedLogsForLifi(log) {
+    const lifiAbi = [
+      "event ComposeSent(address from, address to, bytes32 guid, uint16 index, bytes message)"
+    ];
+    const decoder = new ethers.Interface(lifiAbi);
     return decoder.parseLog({ topics: log.topics, data: log.data});
   }
 
@@ -243,10 +300,10 @@ export class ApiController {
     return filteredLog[0];
   }
 
-  private async getTransferLogsInSource(address, logs) {
+  private async getTransferLogsInSource(address: string, logs) {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
     const filteredLog = logs
-      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[1].slice(-40) === address);
+      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[1].slice(-40).toLowerCase() === address.toLowerCase());
     return filteredLog[0];
   }
 
@@ -254,9 +311,14 @@ export class ApiController {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
     if(address === "")
       return logs.filter(log => log.topics[0] === transferCode)[0]; //수신자 주소 모를경우
-
     return logs
-      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[2].slice(-40) === address)[0];
+      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[2].slice(-40).toLowerCase() === address.toLowerCase())[0];
+  }
+
+  private async getLiFiLogsInDestination(logs) {
+    const transferCode = '0x3d52ff888d033fd3dd1d8057da59e850c91d91a72c41dfa445b247dfedeb6dc1';
+    return logs
+      .filter(log => log.topics[0] === transferCode)[0];
   }
 
   private async getTransactionsByAddressInBNB(address: string, blockNumber: string) {

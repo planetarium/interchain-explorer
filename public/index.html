@@ -171,7 +171,7 @@
 
       <!-- Custom-styled dropdown -->
       <div class="dropdown-container">
-        <select id="chain" class="custom-dropdown">
+        <select id="chainDrive" class="custom-dropdown">
           <option value="Mainnet">Mainnet</option>
           <option value="BNB">BNB</option>
           <option value="Arbitrum">Arbitrum</option>
@@ -182,6 +182,27 @@
         <span id="checkDriveTransactionsLoader" class="loader"></span>
       </button>
       <div id="driveTransactionsResult" class="status"></div>
+    </div>
+  </div>
+
+  <div class="card-container">
+    <div class="card">
+      <h3>Show Destination (Mainnet -> BNB or Arbitrum) Transactions</h3>
+      <input type="text" id="lifiTxHash" placeholder="Enter Source Transaction Hash" />
+
+      <!-- Custom-styled dropdown -->
+      <div class="dropdown-container">
+        <select id="chainLifi" class="custom-dropdown">
+          <option value="Mainnet">Mainnet</option>
+          <option value="BNB">BNB</option>
+          <option value="Arbitrum">Arbitrum</option>
+        </select>
+      </div>
+
+      <button class="btn" id="checkLifiTransactionsBtn" onclick="checkLifiTransactions()">Check Transactions
+        <span id="checkLifiTransactionsLoader" class="loader"></span>
+      </button>
+      <div id="lifiTransactionsResult" class="status"></div>
     </div>
   </div>
 
@@ -298,6 +319,38 @@
         loader.style.display = 'none';
       }
     }
+    async function checkLifiTransactions() {
+      const txHash = document.getElementById('lifiTxHash').value;
+      const chain = document.getElementById('chainLifi').value;
+
+      const button = document.getElementById('checkLifiTransactionsBtn');
+      const loader = document.getElementById('checkLifiTransactionsLoader');
+      const resultDiv = document.getElementById('lifiTransactionsResult');
+
+      button.disabled = true;
+      loader.style.display = 'inline-block';
+
+      try {
+        const response = await fetch(`/api/lifi?srcTxHash=${txHash}&chain=${chain}`);
+        const result = await response.json();
+
+        // Assuming the response is an array of transactions
+        if (result.length > 0) {
+          displayMultipleTransactionGroups(result);
+          resultDiv.textContent = 'Transaction details fetched successfully.';
+          resultDiv.className = 'status success';
+        } else {
+          resultDiv.textContent = 'No transaction details found.';
+          resultDiv.className = 'status error';
+        }
+      } catch (error) {
+        resultDiv.textContent = 'Error checking transactions: ' + error.message;
+        resultDiv.className = 'status error';
+      } finally {
+        button.disabled = false;
+        loader.style.display = 'none';
+      }
+    }
 
     const explorers = {
       'BNB': 'https://bscscan.com',
@@ -312,7 +365,9 @@
       'MGP': 'https://bscscan.com/token/images/magpie_32.png',
       'BSC-USD': 'https://bscscan.com/token/images/busdt_32.png',
       'GHX': 'https://bscscan.com/token/images/gamercoin_32.png',
-      "USDC": "https://etherscan.io/token/images/centre-usdc_28.png"
+      "USDC": "https://etherscan.io/token/images/centre-usdc_28.png",
+      "USDT" : "https://etherscan.io/token/images/tethernew_32.png",
+      "REEF": "https://etherscan.io/token/images/reeffinance_32.png"
       // 다른 토큰 심볼과 로고를 여기 추가
     };
 
@@ -371,13 +426,13 @@
             const destinationValue = (Number(destinationTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
 // 소스 정보 생성
             const sourceInfo = document.createElement('p');
-            sourceInfo.innerHTML = `<strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) - <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a> - Value: ${sourceValue} ETH` ;
+            sourceInfo.innerHTML = `<strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) - <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a> - Value: ${sourceValue}` ;
             sourceInfo.prepend(createTokenImage(sourceTx.id));
             transactionDiv.appendChild(sourceInfo);
 
 // 목적지 정보 생성
             const destinationInfo = document.createElement('p');
-            destinationInfo.innerHTML = `<strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) - <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a> - Value: ${destinationValue} ETH`;
+            destinationInfo.innerHTML = `<strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) - <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a> - Value: ${destinationValue}`;
             destinationInfo.insertBefore(createTokenImage(destinationTx.id), destinationInfo.firstChild);
             transactionDiv.appendChild(destinationInfo);
           } else {
