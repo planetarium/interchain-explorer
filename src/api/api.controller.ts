@@ -45,7 +45,7 @@ export class ApiController {
       inputAmount = BigInt(decodedInputData.args[inputAmountIdx]);
     }
 
-    const sourceLogs = await this.getTransferLogsInDestination(depositorAddress, srcTx.logs);
+    const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
     const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
     const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Mainnet", "value": inputAmount.toString()};
 
@@ -74,6 +74,7 @@ export class ApiController {
     transactionGroups.push(transactions);
     const response = [];
     response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
+    console.log(response);
     return response;
   }
 
@@ -130,7 +131,7 @@ export class ApiController {
     let sourceProvider: Provider
     let destinationProvider: Provider
     if(chain === "BNB") {
-      sourceProvider = this.mainnetProvider;
+      sourceProvider = this.mainnetProvider;  //source Mainnet이라고 가정
       destinationProvider = this.bnbProvider;
     }
     else if(chain === "Arbitrum") {
