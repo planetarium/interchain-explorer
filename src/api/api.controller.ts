@@ -47,8 +47,9 @@ export class ApiController {
 
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
     const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
+    if(sourceTokenSymbol === 'USDT')
+      inputAmount *= BigInt(1000000000000); //표기 양식이 다름
     const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Mainnet", "value": inputAmount.toString()};
-
     let recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === '_toAddress');
     let recipientAddress;
     if(recipientIndex == -1) {
