@@ -45,9 +45,9 @@ export class ApiController {
       inputAmount = BigInt(decodedInputData.args[inputAmountIdx]);
     }
 
-    const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
+    const sourceLogs = await this.getTransferLogsInDestination(depositorAddress, srcTx.logs);
     const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
-    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Ethereum", "value": inputAmount.toString()};
+    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Mainnet", "value": inputAmount.toString()};
 
     let recipientIndex = decodedInputData.fragment.inputs.findIndex(param => param.name === '_toAddress');
     let recipientAddress;
@@ -68,7 +68,7 @@ export class ApiController {
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
     const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, this.bnbProvider);
     const outputAmount = BigInt(parseInt(destinationLogs.data,16));
-    const destinationTx = {"address":recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": "BNB Chain", "value": outputAmount.toString()};
+    const destinationTx = {"address":recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": "BNB", "value": outputAmount.toString()};
     const transactionGroups = [];
     const transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(destTx.blockNumber));
     transactionGroups.push(transactions);
@@ -88,6 +88,41 @@ export class ApiController {
       )
     );
     return data.data[0];
+  }
+
+  @Get('/drive') // LayerZero Protocol (Drive Bus)
+  async getDriveBusAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
+    let provider: Provider
+    if(chain === "BNB")
+      provider = this.bnbProvider;
+    else if(chain === "Arbitrum")
+      provider = this.arbitrumProvider;
+
+    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+
+    const depositorAddress = layerData.source.tx.from;
+    const sourceTx = {"address": depositorAddress, "id": "X", "name": "X", "chain": "Mainnet", "value": "0"};
+
+    const destTx = await provider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destinationLogs = await this.getTransferLogsInDestination("", destTx.logs);
+    const recipientAddress = '0x' + destinationLogs.topics[2].slice(-40);
+    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, provider);
+    const outputAmount = BigInt(parseInt(destinationLogs.data,16));
+    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+
+    const transactionGroups = [];
+    let transactions;
+    if(chain === 'BNB')
+      transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+    else if(chain === "Arbitrum")
+      transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+
+    transactionGroups.push(transactions);
+    const response = [];
+    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
+
+    console.log(response);
+    return response;
   }
 
   @Get('/arbitrum') // Across Protocol
@@ -120,7 +155,7 @@ export class ApiController {
     }
     const response = [];
     const { tokenName, tokenSymbol } = await this.getTokenInfo(tokenAddress, this.mainnetProvider);
-    const sourceTx = {"address":depositorAddress, "id": tokenSymbol, "name":tokenName, "chain": "Ethereum", "value": inputAmount.toString()};
+    const sourceTx = {"address":depositorAddress, "id": tokenSymbol, "name":tokenName, "chain": "Mainnet", "value": inputAmount.toString()};
     const destinationTx = {"address":recipientAddress, "id": tokenSymbol, "name":tokenName, "chain": "Arbitrum", "value": outputAmount.toString()};
 
     response.push({"sourceTx":sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups});
@@ -201,6 +236,13 @@ export class ApiController {
     return data.result;
   }
 
+  private async getTransferLogs(logs) {
+    const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const filteredLog = logs
+      .filter(log => log.topics[0] === transferCode);
+    return filteredLog[0];
+  }
+
   private async getTransferLogsInSource(address, logs) {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
     const filteredLog = logs
@@ -208,11 +250,13 @@ export class ApiController {
     return filteredLog[0];
   }
 
-  private async getTransferLogsInDestination(address, logs) {
+  private async getTransferLogsInDestination(address: string, logs) {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-    const filteredLog = logs
-      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[2].slice(-40) === address);
-    return filteredLog[0];
+    if(address === "")
+      return logs.filter(log => log.topics[0] === transferCode)[0]; //수신자 주소 모를경우
+
+    return logs
+      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[2].slice(-40) === address)[0];
   }
 
   private async getTransactionsByAddressInBNB(address: string, blockNumber: string) {
