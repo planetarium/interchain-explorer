@@ -71,8 +71,10 @@ export class ApiController {
     const outputAmount = BigInt(parseInt(destinationLogs.data,16));
     const destinationTx = {"address":recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": "BNB", "value": outputAmount.toString()};
     const transactionGroups = [];
-    const transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(destTx.blockNumber));
-    transactionGroups.push(transactions);
+    const transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+
+    if(transactions)
+      transactionGroups.push(transactions);
     const response = [];
     response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
     console.log(response);
@@ -115,11 +117,11 @@ export class ApiController {
     const transactionGroups = [];
     let transactions;
     if(chain === 'BNB')
-      transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+      transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
     else if(chain === "Arbitrum")
-      transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
-
-    transactionGroups.push(transactions);
+      transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+    if(transactions)
+      transactionGroups.push(transactions);
     const response = [];
     response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
 
@@ -139,7 +141,6 @@ export class ApiController {
       sourceProvider = this.mainnetProvider;
       destinationProvider = this.arbitrumProvider;
     }
-
 
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
     const srcTx = await this.getTxInMainnet(srcTxHash);
@@ -164,15 +165,64 @@ export class ApiController {
     const transactionGroups = [];
     let transactions;
     if(chain === 'BNB')
-      transactions = await this.getTransactionsByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+      transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
     else if(chain === "Arbitrum")
-      transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
-
-    transactionGroups.push(transactions);
+      transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+    if(transactions)
+      transactionGroups.push(transactions);
     const response = [];
     response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
 
     console.log(response);
+    return response;
+  }
+
+  @Get('/rango') // LayerZero Protocol (Li-Fi)
+  async getRangoAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
+    let sourceProvider: Provider
+    let destinationProvider: Provider
+    if(chain === "BNB") {
+      sourceProvider = this.mainnetProvider;  //source Mainnet이라고 가정
+      destinationProvider = this.bnbProvider;
+    }
+    else if(chain === "Arbitrum") {
+      sourceProvider = this.mainnetProvider;
+      destinationProvider = this.arbitrumProvider;
+    }
+
+    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+    const srcTx = await this.getTxInMainnet(srcTxHash);
+
+    const depositorAddress = layerData.source.tx.from;
+    const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
+    const inputAmount = BigInt(parseInt(sourceLogs.data,16));
+    const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, sourceProvider);
+    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name": sourceTokenName, "chain": "Mainnet", "value": inputAmount.toString()};
+    const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+
+    const rangoLogs = await this.getRangoLogsInDestination(destTx.logs);
+    const decodedSendTokenData = await this.getDecodedSendTokenEventForRango(rangoLogs)
+    const recipientIdx = decodedSendTokenData.fragment.inputs.findIndex(param => param.name === '_receiver');
+    const recipientAddress = decodedSendTokenData.args[recipientIdx];
+    const outputAmountIdx = decodedSendTokenData.fragment.inputs.findIndex(param => param.name === '_amount');
+    const outputAmount = BigInt(decodedSendTokenData.args[outputAmountIdx]);
+    const withdrawalLogs = await this.getWithdrawalLogsInDestination(destTx.logs);
+    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(withdrawalLogs.address, destinationProvider);
+    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+
+    const transactionGroups = [];
+    let transactions;
+    if(chain === 'BNB')
+      transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+    else if(chain === "Arbitrum")
+      transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+    if(transactions)
+      transactionGroups.push(transactions);
+    const response = [];
+    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
+
+    console.log(response);
+    console.log(response[0]['transactionGroups']);
     return response;
   }
 
@@ -201,7 +251,7 @@ export class ApiController {
     const transactionGroups = [];
     if(recipientAddress) {
       const blockNumber = await this.getBlockNumberByTimeStamp(timeStamp);
-      const transactions = await this.getTransactionsByAddressInArbitrum(recipientAddress, blockNumber);
+      const transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, blockNumber);
       transactionGroups.push(transactions);
     }
     const response = [];
@@ -215,6 +265,8 @@ export class ApiController {
   }
 
   private async getTokenInfo(tokenAddress: string, provider: Provider) {
+    if(tokenAddress === '0x0000000000000000000000000000000000000000')
+      return { tokenName: 'unknown', tokenSymbol: 'unknown' };
     const tokenContract = new Contract(tokenAddress, ["function name() view returns (string)", "function symbol() view returns (string)"], provider);
     const tokenName = await tokenContract.name();
     const tokenSymbol = await tokenContract.symbol();
@@ -241,6 +293,22 @@ export class ApiController {
       "event ComposeSent(address from, address to, bytes32 guid, uint16 index, bytes message)"
     ];
     const decoder = new ethers.Interface(lifiAbi);
+    return decoder.parseLog({ topics: log.topics, data: log.data});
+  }
+
+  private async getDecodedSendTokenEventForRango(log) {
+    const rangoAbi = [
+      "event SendToken (address _token, uint256 _amount, address _receiver)"
+    ];
+    const decoder = new ethers.Interface(rangoAbi);
+    return decoder.parseLog({ topics: log.topics, data: log.data});
+  }
+
+  private async getDecodedWithdrawalEventForRango(log) {
+    const rangoAbi = [
+      "event Withdrawal (address src, uint256 wad)"
+    ];
+    const decoder = new ethers.Interface(rangoAbi);
     return decoder.parseLog({ topics: log.topics, data: log.data});
   }
 
@@ -323,7 +391,19 @@ export class ApiController {
       .filter(log => log.topics[0] === transferCode)[0];
   }
 
-  private async getTransactionsByAddressInBNB(address: string, blockNumber: string) {
+  private async getRangoLogsInDestination(logs) {
+    const transferCode = '0xdf4363408b2d9811d1e5c23efdb5bae0b7a68bd9de2de1cbae18a11be3e67ef5'; //SendToken method
+    return logs
+      .filter(log => log.topics[0] === transferCode)[0];
+  }
+
+  private async getWithdrawalLogsInDestination(logs) {
+    const transferCode = '0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65'; //SendToken method
+    return logs
+      .filter(log => log.topics[0] === transferCode)[0];
+  }
+
+  private async getTokenTxByAddressInBNB(address: string, blockNumber: string) {
     if(address.length > 40)
       address = "0x" + address.slice(-40);
     const url = `https://api.bscscan.com/api?module=account&action=tokentx&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
@@ -341,26 +421,34 @@ export class ApiController {
       return data.result;
     }
     else {
-      console.log(data.message);
+      return await this.getTxListByAddressInBNB(address, blockNumber);
     }
   }
-  private async getBlockNumberByTimeStamp(timeStamp: string) {
-    const url = `https://api.arbiscan.io/api?module=block&action=getblocknobytime&timestamp=${timeStamp}&closest=after&apikey=YourApiKeyToken`
+
+  private async getTxListByAddressInBNB(address: string, blockNumber: string) {
+    if(address.length > 40)
+      address = "0x" + address.slice(-40);
+    const url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
           console.log("Error fetching transaction history:", error.message);
-          throw new Error("An error occurred while fetching account transaction history.");
+          throw new Error("An error occurred while fetching transaction history.");
         })
       )
     );
-    if(data.message == "OK")
+    for (const tx of data.result)
+      tx.chain = "BNB"; //구분을 위한 체인명 삽입
+    if (data.message == "OK") {
       return data.result;
-
-    return "0";
+    }
+    else {
+      console.log(data.message);
+    }
   }
-  private async getTransactionsByAddressInArbitrum(address: string, blockNumber: string) {
-    const url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=desc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
+
+  private async getTokenTxByAddressInArbitrum(address: string, blockNumber: string) {
+    const url = `https://api.arbiscan.io/api?module=account&action=tokentx&address=${address}&page=1&offset=6&sort=desc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
@@ -375,18 +463,48 @@ export class ApiController {
     if(data.message == "OK") {
       return data.result;
     }
+    else {
+      return await this.getTxListByAddressInArbitrum(address, blockNumber);
+    }
 
-    return "";
   }
 
-  @Get('/status/mainnet')
-  async getStatusMainNet(@Query('txHash') txHash: string) {
-    return await this.mainnetProvider.getTransactionReceipt(txHash);
+  private async getTxListByAddressInArbitrum(address: string, blockNumber: string) {
+    if(address.length > 40)
+      address = "0x" + address.slice(-40);
+    const url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
+    const { data } = await firstValueFrom(
+      this.httpService.get(url).pipe(
+        catchError((error: AxiosError) => {
+          console.log("Error fetching transaction history:", error.message);
+          throw new Error("An error occurred while fetching transaction history.");
+        })
+      )
+    );
+    for (const tx of data.result)
+      tx.chain = "BNB"; //구분을 위한 체인명 삽입
+    if (data.message == "OK") {
+      return data.result;
+    }
+    else {
+      console.log(data.message);
+    }
   }
 
-  @Get('/status/bnb')
-  async getStatusBNB(@Query('txHash') txHash: string) {
-    return null;
-    // return await this.bnbProvider.getTransactionReceipt(txHash);
+
+  private async getBlockNumberByTimeStamp(timeStamp: string) {
+    const url = `https://api.arbiscan.io/api?module=block&action=getblocknobytime&timestamp=${timeStamp}&closest=after&apikey=YourApiKeyToken`
+    const { data } = await firstValueFrom(
+      this.httpService.get(url).pipe(
+        catchError((error: AxiosError) => {
+          console.log("Error fetching transaction history:", error.message);
+          throw new Error("An error occurred while fetching account transaction history.");
+        })
+      )
+    );
+    if(data.message == "OK")
+      return data.result;
+
+    return "0";
   }
 }

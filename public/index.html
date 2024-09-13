@@ -206,6 +206,27 @@
     </div>
   </div>
 
+  <div class="card-container">
+    <div class="card">
+      <h3><b>Rango</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
+      <input type="text" id="rangoTxHash" placeholder="Enter Source Transaction Hash" />
+
+      <!-- Custom-styled dropdown -->
+      <div class="dropdown-container">
+        <select id="chainRango" class="custom-dropdown">
+          <option value="Mainnet">Mainnet</option>
+          <option value="BNB">BNB</option>
+          <option value="Arbitrum">Arbitrum</option>
+        </select>
+      </div>
+
+      <button class="btn" id="checkRangoTransactionsBtn" onclick="checkRangoTransactions()">Check Transactions
+        <span id="checkRangoTransactionsLoader" class="loader"></span>
+      </button>
+      <div id="rangoTransactionsResult" class="status"></div>
+    </div>
+  </div>
+
 
   <!-- Transaction Details Table -->
   <div id="transactionDetails" class="details-container" style="display: none;">
@@ -351,6 +372,38 @@
         loader.style.display = 'none';
       }
     }
+    async function checkRangoTransactions() {
+      const txHash = document.getElementById('rangoTxHash').value;
+      const chain = document.getElementById('chainRango').value;
+
+      const button = document.getElementById('checkRangoTransactionsBtn');
+      const loader = document.getElementById('checkRangoTransactionsLoader');
+      const resultDiv = document.getElementById('rangoTransactionsResult');
+
+      button.disabled = true;
+      loader.style.display = 'inline-block';
+
+      try {
+        const response = await fetch(`/api/rango?srcTxHash=${txHash}&chain=${chain}`);
+        const result = await response.json();
+
+        // Assuming the response is an array of transactions
+        if (result.length > 0) {
+          displayMultipleTransactionGroups(result);
+          resultDiv.textContent = 'Transaction details fetched successfully.';
+          resultDiv.className = 'status success';
+        } else {
+          resultDiv.textContent = 'No transaction details found.';
+          resultDiv.className = 'status error';
+        }
+      } catch (error) {
+        resultDiv.textContent = 'Error checking transactions: ' + error.message;
+        resultDiv.className = 'status error';
+      } finally {
+        button.disabled = false;
+        loader.style.display = 'none';
+      }
+    }
 
     const explorers = {
       'BNB': 'https://bscscan.com',
@@ -362,6 +415,7 @@
       'QORPO': 'https://etherscan.io/token/images/qorpo_32.png',
       'WETH': 'https://arbiscan.io/token/images/weth_28.png',
       'WNCG': 'https://etherscan.io/token/images/wrappedncg_32.png?=v37',
+      'WBNB' : 'https://etherscan.io/token/images/binancebnb_32.png',
       'MGP': 'https://bscscan.com/token/images/magpie_32.png',
       'BSC-USD': 'https://bscscan.com/token/images/busdt_32.png',
       'GHX': 'https://bscscan.com/token/images/gamercoin_32.png',
@@ -370,6 +424,7 @@
       "REEF": "https://etherscan.io/token/images/reeffinance_32.png",
       'wstETH' : "https://etherscan.io/token/images/wsteth3_32.png",
       'Cake' : "https://bscscan.com/token/images/pancake_32.png?=v1",
+      'unknown' : "/unknown.png"
       // 다른 토큰 심볼과 로고를 여기 추가
     };
 
@@ -463,7 +518,7 @@
             },
             {
               label: 'Value',
-              value: (BigInt(transaction.value) / BigInt(1e18)).toString() + ' Token'
+              value: Number((BigInt(transaction.value) / BigInt(1e18)).toString()).toFixed(5) + ' Token'
             },
             {
               label: 'Timestamp',
