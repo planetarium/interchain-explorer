@@ -21,8 +21,8 @@ export class ApiController {
               private readonly configService: ConfigService,
               private readonly httpService: HttpService) {}
 
-  @Get('/bnb') // LayerZero Protocol (OFTP
-  async getBNBAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
+  @Get('/oft') // LayerZero Protocol (OFTP, ProxyOFT, Pancake, Stargate)
+  async getOFTAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
     let destinationProvider: Provider
     if(chain === "BNB")
       destinationProvider = this.bnbProvider;
@@ -53,7 +53,12 @@ export class ApiController {
     }
 
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
-    const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
+    let sourceTokenName = 'ETH', sourceTokenSymbol = 'ETH';
+    if (sourceLogs) { //token으로 전송하는 경우.
+      const { tokenName, tokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
+      sourceTokenName = tokenName;
+      sourceTokenSymbol = tokenSymbol;
+    }
     if(sourceTokenSymbol === 'USDT')
       inputAmount *= BigInt(1000000000000); //표기 양식이 다름
     const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Mainnet", "value": inputAmount.toString()};
@@ -74,15 +79,28 @@ export class ApiController {
 
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
-    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
-    const outputAmount = BigInt(parseInt(destinationLogs.data,16));
-    const destinationTx = {"address":recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+    let destinationTokenName = 'ETH', destinationTokenSymbol = 'ETH';
+    let destinationTx;
+    if (destinationLogs) { //token으로 전송하는 경우.
+      const { tokenName, tokenSymbol } = await this.getTokenInfo(sourceLogs.address, this.mainnetProvider);
+      destinationTokenName = tokenName;
+      destinationTokenSymbol = tokenSymbol;
+      const outputAmount = BigInt(parseInt(destinationLogs.data,16));
+      destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+    }
+    else { // (Transfer이 없이 ETH전송)
+      const oftLogs = await this.getOFTReceivedLogsInDestination(destTx.logs);
+      recipientAddress = '0x' + oftLogs.topics[2].slice(-40);
+      const outputAmountHex = '0x' + oftLogs.data.slice(66);  // Second 32 bytes
+      const outputAmount = BigInt(parseInt(outputAmountHex,16));  // Convert to string for large numbers
+      destinationTx = {"address": recipientAddress, "id": 'ETH', "name": 'ETH', "chain": chain, "value": outputAmount.toString()};
+    }
     const transactionGroups = [];
 
     let transactions;
     if(chain == 'BNB')
       transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
-    else
+    else if(chain == 'Arbitrum')
       transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
 
 
