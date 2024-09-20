@@ -22,7 +22,14 @@ export class ApiController {
               private readonly httpService: HttpService) {}
 
   @Get('/bnb') // LayerZero Protocol (OFTP
-  async getBNBAccountTx(@Query('srcTxHash') srcTxHash: string) {
+  async getBNBAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
+    let destinationProvider: Provider
+    if(chain === "BNB")
+      destinationProvider = this.bnbProvider;
+    else if(chain === "Arbitrum")
+      destinationProvider = this.arbitrumProvider;
+
+
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
     const srcTx = await this.getTxInMainnet(srcTxHash);
     const depositorAddress = layerData.source.tx.from;
@@ -65,9 +72,9 @@ export class ApiController {
       recipientAddress = "0x" + decodedInputData.args[recipientIndex].slice(-40);
     }
 
-    const destTx = await this.bnbProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
-    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, this.bnbProvider);
+    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
     const outputAmount = BigInt(parseInt(destinationLogs.data,16));
     const destinationTx = {"address":recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": "BNB", "value": outputAmount.toString()};
     const transactionGroups = [];
@@ -106,13 +113,22 @@ export class ApiController {
 
     const depositorAddress = layerData.source.tx.from;
     const sourceTx = {"address": depositorAddress, "id": "X", "name": "X", "chain": "Mainnet", "value": "0"};
-
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
     const destinationLogs = await this.getTransferLogsInDestination("", destTx.logs);
-    const recipientAddress = '0x' + destinationLogs.topics[2].slice(-40);
-    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
-    const outputAmount = BigInt(parseInt(destinationLogs.data,16));
-    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+    let destinationTx, recipientAddress;
+    if(destinationLogs) { // Transfer로그 있고 토큰 전송
+      recipientAddress = '0x' + destinationLogs.topics[2].slice(-40);
+      const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
+      const outputAmount = BigInt(parseInt(destinationLogs.data,16));
+      destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+    }
+    else { // (Transfer이 없이 ETH전송)
+      const oftLogs = await this.getOFTReceivedLogsInDestination(destTx.logs);
+      recipientAddress = '0x' + oftLogs.topics[2].slice(-40);
+      const outputAmountHex = '0x' + oftLogs.data.slice(66);  // Second 32 bytes
+      const outputAmount = BigInt(parseInt(outputAmountHex,16));  // Convert to string for large numbers
+      destinationTx = {"address": recipientAddress, "id": 'ETH', "name": 'ETH', "chain": chain, "value": outputAmount.toString()};
+    }
 
     const transactionGroups = [];
     let transactions;
@@ -304,13 +320,14 @@ export class ApiController {
     return decoder.parseLog({ topics: log.topics, data: log.data});
   }
 
-  private async getDecodedWithdrawalEventForRango(log) {
-    const rangoAbi = [
-      "event Withdrawal (address src, uint256 wad)"
+  private async getDecodedOFTReceivedEventForDrive(log) {
+    const driveABI = [
+      "event OFTReceived (bytes32 guid, uint32 srcEid, address toAddress, uint256 amountReceivedLD)"
     ];
-    const decoder = new ethers.Interface(rangoAbi);
-    return decoder.parseLog({ topics: log.topics, data: log.data});
+    const decoder = new ethers.Interface(driveABI);
+    return decoder.parseLog({ topics: log.topics, data: '0x' + log.data.slice(-66)});
   }
+
 
   private async getTxABIInMainnet(srcTx) {
     const url = `https://api.etherscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("MAINNET_API_KEY")}`;
@@ -399,6 +416,12 @@ export class ApiController {
 
   private async getWithdrawalLogsInDestination(logs) {
     const transferCode = '0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65'; //SendToken method
+    return logs
+      .filter(log => log.topics[0] === transferCode)[0];
+  }
+
+  private async getOFTReceivedLogsInDestination(logs) {
+    const transferCode = '0xefed6d3500546b29533b128a29e3a94d70788727f0507505ac12eaf2e578fd9c'; //SendToken method
     return logs
       .filter(log => log.topics[0] === transferCode)[0];
   }
