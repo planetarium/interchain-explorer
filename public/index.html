@@ -147,9 +147,17 @@
   <!-- BNB Transaction Check -->
   <div class="card-container">
     <div class="card">
-      <h3>OFT, Proxy OFT, Pancake(Mainnet -> BNB) Transactions</h3>
+      <h3>OFT, Proxy OFT, Pancake(Mainnet -> BNB or Arbitrum) Transactions</h3>
       <input type="text" id="bnbTxHash" placeholder="Enter Source Transaction Hash" />
-      <button class="btn" id="checkBNBTransactionsBtn" onclick="checkBNBTransactions()">Check Transactions <span id="checkBNBTransactionsLoader" class="loader"></span></button>
+
+      <div class="dropdown-container">
+        <select id="chainOFT" class="custom-dropdown">
+          <option value="Mainnet">Mainnet</option>
+          <option value="BNB">BNB</option>
+          <option value="Arbitrum">Arbitrum</option>
+        </select>
+      </div>
+      <button class="btn" id="checkBNBTransactionsBtn" onclick="checkOFTTransactions()">Check Transactions <span id="checkBNBTransactionsLoader" class="loader"></span></button>
       <div id="bnbTransactionsResult" class="status"></div>
     </div>
   </div>
@@ -247,8 +255,9 @@
   </div>
 
   <script>
-    async function checkBNBTransactions() {
+    async function checkOFTTransactions() {
       const txHash = document.getElementById('bnbTxHash').value;
+      const chain = document.getElementById('chainOFT').value;
       const button = document.getElementById('checkBNBTransactionsBtn');
       const loader = document.getElementById('checkBNBTransactionsLoader');
       const resultDiv = document.getElementById('bnbTransactionsResult');
@@ -257,7 +266,7 @@
       loader.style.display = 'inline-block';
 
       try {
-        const response = await fetch(`/api/bnb?srcTxHash=${txHash}`);
+        const response = await fetch(`/api/bnb?srcTxHash=${txHash}&chain=${chain}`);
         const result = await response.json();
         // Assuming the response is an array of transactions
         if (result.length > 0) {
@@ -310,7 +319,7 @@
 
     async function checkDriveTransactions() {
       const txHash = document.getElementById('driveTxHash').value;
-      const chain = document.getElementById('chain').value;
+      const chain = document.getElementById('chainDrive').value;
 
       const button = document.getElementById('checkDriveTransactionsBtn');
       const loader = document.getElementById('checkDriveTransactionsLoader');
@@ -418,6 +427,7 @@
       'WBNB' : 'https://etherscan.io/token/images/binancebnb_32.png',
       'MGP': 'https://bscscan.com/token/images/magpie_32.png',
       'BSC-USD': 'https://bscscan.com/token/images/busdt_32.png',
+      'DMT': 'https://etherscan.io/token/images/sankodreammachine_32.png',
       'GHX': 'https://bscscan.com/token/images/gamercoin_32.png',
       "USDC": "https://etherscan.io/token/images/centre-usdc_28.png",
       "USDT" : "https://etherscan.io/token/images/tethernew_32.png",

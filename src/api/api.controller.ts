@@ -76,9 +76,15 @@ export class ApiController {
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
     const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
     const outputAmount = BigInt(parseInt(destinationLogs.data,16));
-    const destinationTx = {"address":recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": "BNB", "value": outputAmount.toString()};
+    const destinationTx = {"address":recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": chain, "value": outputAmount.toString()};
     const transactionGroups = [];
-    const transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+
+    let transactions;
+    if(chain == 'BNB')
+      transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+    else
+      transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+
 
     if(transactions)
       transactionGroups.push(transactions);
