@@ -112,6 +112,69 @@ export class ApiController {
     return response;
   }
 
+  @Get('/bridge') // LayerZero Protocol (OFTP, ProxyOFT, Pancake, Stargate)
+  async getBridgeAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
+    let destinationProvider: Provider
+    if(chain === "BNB")
+      destinationProvider = this.bnbProvider;
+    else if(chain === "Arbitrum")
+      destinationProvider = this.arbitrumProvider;
+
+    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const depositorAddress = layerData.source.tx.from;
+    const abi = await this.getTxABIInMainnet(srcTx);
+
+    const decodedInputData = await this.getDecodedInputData(abi, srcTxHash);
+    const BridgeData = decodedInputData.fragment.inputs.find(param => param.name === '_bridgeParams');
+    const inputAmountIdx = BridgeData.components.findIndex(param => param.name === 'amountIn');
+    const inputAmount = BigInt(decodedInputData.args.at(0)[inputAmountIdx]);
+
+    const sourceTokenIdx = BridgeData.components.findIndex(param => param.name === 'tokenIn');
+    const sourceToken = decodedInputData.args.at(0)[sourceTokenIdx];
+
+    const recipientAddressIdx = BridgeData.components.findIndex(param => param.name === 'to');
+    const recipientAddress = "0x" + decodedInputData.args.at(0)[recipientAddressIdx].slice(-40);
+
+    const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
+    let sourceTokenName = 'ETH', sourceTokenSymbol = 'ETH';
+    if (sourceLogs) { //token으로 전송하는 경우.
+      const { tokenName, tokenSymbol } = await this.getTokenInfo(sourceToken, this.mainnetProvider);
+      sourceTokenName = tokenName;
+      sourceTokenSymbol = tokenSymbol;
+    }
+    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": "Mainnet", "value": inputAmount.toString()};
+
+    const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destinationLogs = await this.getBridgeLogsInDestination(destTx.logs);
+    let destinationTokenName = 'ETH', destinationTokenSymbol = 'ETH';
+    let destinationTx;
+    if (destinationLogs) {
+      const destinationToken = '0x' + destinationLogs.topics[3].slice(-40);
+      const { tokenName, tokenSymbol } = await this.getTokenInfo(destinationToken, this.mainnetProvider);
+      destinationTokenName = tokenName;
+      destinationTokenSymbol = tokenSymbol;
+      const amountOutHex = '0x' + destinationLogs.data.slice(-64);  // Last 32 bytes
+      const outputAmount = BigInt(parseInt(amountOutHex, 16));
+      destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+    }
+
+    const transactionGroups = [];
+
+    let transactions;
+    if(chain == 'BNB')
+      transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+    else if(chain == 'Arbitrum')
+      transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+
+    if(transactions)
+      transactionGroups.push(transactions);
+    const response = [];
+    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
+    console.log(response);
+    return response;
+  }
+
   private async getLayerZeroScanInfo(srcTxHash: string) {
     const url = `https://scan.layerzero-api.com/v1/messages/tx/${srcTxHash}`;
     const { data } = await firstValueFrom(
@@ -347,6 +410,8 @@ export class ApiController {
   private async getTokenInfo(tokenAddress: string, provider: Provider) {
     if(tokenAddress === '0x0000000000000000000000000000000000000000')
       return { tokenName: 'unknown', tokenSymbol: 'unknown' };
+    else if(tokenAddress === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
+      return { tokenName: 'ETH', tokenSymbol: 'ETH' };
     const tokenContract = new Contract(tokenAddress, ["function name() view returns (string)", "function symbol() view returns (string)"], provider);
     const tokenName = await tokenContract.name();
     const tokenSymbol = await tokenContract.symbol();
@@ -465,6 +530,12 @@ export class ApiController {
       return logs.filter(log => log.topics[0] === transferCode)[0]; //수신자 주소 모를경우
     return logs
       .filter(log => log.topics[0] === transferCode && '0x' + log.topics[2].slice(-40).toLowerCase() === address.toLowerCase())[0];
+  }
+
+  private async getBridgeLogsInDestination(logs) {
+    const transferCode = '0x2db5ddd0b42bdbca0d69ea16f234a870a485854ae0d91f16643d6f317d8b8994';
+    return logs
+      .filter(log => log.topics[0] === transferCode)[0];
   }
 
   private async getClaimLogsInSource(logs) {
