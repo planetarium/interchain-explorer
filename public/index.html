@@ -195,6 +195,27 @@
 
   <div class="card-container">
     <div class="card">
+      <h3><b>Claim</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
+      <input type="text" id="claimTxHash" placeholder="Enter Source Transaction Hash" />
+
+      <!-- Custom-styled dropdown -->
+      <div class="dropdown-container">
+        <select id="chainClaim" class="custom-dropdown">
+          <option value="Mainnet">Mainnet</option>
+          <option value="BNB">BNB</option>
+          <option value="Arbitrum">Arbitrum</option>
+        </select>
+      </div>
+
+      <button class="btn" id="checkClaimTransactionsBtn" onclick="checkClaimTransactions()">Check Transactions
+        <span id="checkClaimTransactionsLoader" class="loader"></span>
+      </button>
+      <div id="claimTransactionsResult" class="status"></div>
+    </div>
+  </div>
+
+  <div class="card-container">
+    <div class="card">
       <h3><b>Li-fi</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
       <input type="text" id="lifiTxHash" placeholder="Enter Source Transaction Hash" />
 
@@ -317,6 +338,39 @@
       }
     }
 
+    async function checkClaimTransactions() {
+      const txHash = document.getElementById('claimTxHash').value;
+      const chain = document.getElementById('chainClaim').value;
+
+      const button = document.getElementById('checkClaimTransactionsBtn');
+      const loader = document.getElementById('checkClaimTransactionsLoader');
+      const resultDiv = document.getElementById('claimTransactionsResult');
+
+      button.disabled = true;
+      loader.style.display = 'inline-block';
+
+      try {
+        const response = await fetch(`/api/claim?srcTxHash=${txHash}&chain=${chain}`);
+        const result = await response.json();
+
+        // Assuming the response is an array of transactions
+        if (result.length > 0) {
+          displayMultipleTransactionGroups(result);
+          resultDiv.textContent = 'Transaction details fetched successfully.';
+          resultDiv.className = 'status success';
+        } else {
+          resultDiv.textContent = 'No transaction details found.';
+          resultDiv.className = 'status error';
+        }
+      } catch (error) {
+        resultDiv.textContent = 'Error checking transactions: ' + error.message;
+        resultDiv.className = 'status error';
+      } finally {
+        button.disabled = false;
+        loader.style.display = 'none';
+      }
+    }
+
     async function checkDriveTransactions() {
       const txHash = document.getElementById('driveTxHash').value;
       const chain = document.getElementById('chainDrive').value;
@@ -349,6 +403,7 @@
         loader.style.display = 'none';
       }
     }
+
     async function checkLifiTransactions() {
       const txHash = document.getElementById('lifiTxHash').value;
       const chain = document.getElementById('chainLifi').value;
@@ -476,7 +531,7 @@
             transactionDiv.style.padding = '10px';
             transactionDiv.style.borderRadius = '8px';
 
-            const defaultLogoUrl = 'path/to/default/logo.png';
+            const defaultLogoUrl = 'https://arbiscan.io/images/main/empty-token.png';
 
 // 이미지 요소 생성 함수
             function createTokenImage(tokenId) {

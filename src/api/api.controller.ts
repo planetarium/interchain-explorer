@@ -125,6 +125,46 @@ export class ApiController {
     return data.data[0];
   }
 
+  @Get('/claim') // LayerZero Protocol (Claim)
+  async getClaimAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
+    let destinationProvider: Provider
+    if(chain === "BNB")
+      destinationProvider = this.bnbProvider;
+    else if(chain === "Arbitrum")
+      destinationProvider = this.arbitrumProvider;
+
+    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+
+    const depositorAddress = layerData.source.tx.from;
+    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const claimLogs = await this.getClaimLogsInSource(srcTx.logs);
+    const recipientAddress = '0x' + claimLogs.data.slice(0, 66).slice(-40);  // First 32 bytes
+    // const inputAmountHex = '0x' + claimLogs.data.slice(66);  // Second 32 bytes
+    // const inputAmount = BigInt(parseInt(inputAmountHex,16));  // Convert to string for large numbers
+
+    const sourceTx = {"address": depositorAddress, "id": "X", "name": "X", "chain": "Mainnet", "value": "0"};
+    const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+
+    const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
+    const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
+    const outputAmount = BigInt(parseInt(destinationLogs.data,16));
+    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+
+    const transactionGroups = [];
+    let transactions;
+    if(chain === 'BNB')
+      transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+    else if(chain === "Arbitrum")
+      transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+    if(transactions)
+      transactionGroups.push(transactions);
+    const response = [];
+    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
+
+    console.log(response);
+    return response;
+  }
+
   @Get('/drive') // LayerZero Protocol (Drive Bus)
   async getDriveBusAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
     let destinationProvider: Provider
@@ -320,6 +360,14 @@ export class ApiController {
     return decodedInputData;
   }
 
+  private async getDecodedLogsForClaim(log) {
+    const acrossProtocolAbi = [
+      "event uint256 poolId, address user, address receiver, uint256 amount)"
+    ];
+    const decoder = new ethers.Interface(acrossProtocolAbi);
+    return decoder.parseLog({ topics: log.topics, data: log.data});
+  }
+
   private async getDecodedLogsForAcrossProtocol(log) {
     const acrossProtocolAbi = [
       "event V3FundsDeposited(address inputToken, address outputToken, uint256 inputAmount, uint256 outputAmount, uint256 indexed destinationChainId, uint32 indexed depositId, uint32 quoteTimestamp, uint32 fillDeadline, uint32 exclusivityDeadline, address indexed depositor, address recipient, address exclusiveRelayer, bytes message)"
@@ -404,13 +452,6 @@ export class ApiController {
     return data.result;
   }
 
-  private async getTransferLogs(logs) {
-    const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-    const filteredLog = logs
-      .filter(log => log.topics[0] === transferCode);
-    return filteredLog[0];
-  }
-
   private async getTransferLogsInSource(address: string, logs) {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
     const filteredLog = logs
@@ -424,6 +465,12 @@ export class ApiController {
       return logs.filter(log => log.topics[0] === transferCode)[0]; //수신자 주소 모를경우
     return logs
       .filter(log => log.topics[0] === transferCode && '0x' + log.topics[2].slice(-40).toLowerCase() === address.toLowerCase())[0];
+  }
+
+  private async getClaimLogsInSource(logs) {
+    const transferCode = '0xace6f3f8956413e2875b9070e2616d13687dfb251cf63b343028c32822dfa263';
+    return logs
+      .filter(log => log.topics[0] === transferCode)[0];
   }
 
   private async getLiFiLogsInDestination(logs) {
