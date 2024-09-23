@@ -95,21 +95,36 @@ export class ApiController {
       const outputAmount = BigInt(parseInt(outputAmountHex,16));  // Convert to string for large numbers
       destinationTx = {"address": recipientAddress, "id": 'ETH', "name": 'ETH', "chain": chain, "value": outputAmount.toString()};
     }
-    const transactionGroups = [];
 
-    let transactions;
-    if(chain == 'BNB')
-      transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
-    else if(chain == 'Arbitrum')
-      transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
-
-
-    if(transactions)
-      transactionGroups.push(transactions);
+    const { transactionGroups, tokenGroups } = await this.makeResponseGroups(chain, recipientAddress, destTx.blockNumber);
     const response = [];
-    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
+    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups, "tokenGroups": tokenGroups });
     console.log(response);
     return response;
+  }
+
+  private async makeResponseGroups(chain: string, recipientAddress, blockNumber: number) {
+    let transactions, tokens;
+    if (chain == "BNB") {
+      [transactions, tokens] = await Promise.all([
+        this.getTxListByAddressInBNB(recipientAddress, String(blockNumber)),
+        this.getTokenTxByAddressInBNB(recipientAddress, String(blockNumber))
+      ]);
+    } else if (chain == "Arbitrum") {
+      [transactions, tokens] = await Promise.all([
+        this.getTxListByAddressInArbitrum(recipientAddress, String(blockNumber)),
+        this.getTokenTxByAddressInArbitrum(recipientAddress, String(blockNumber))
+      ]);
+    }
+
+    const transactionGroups = [];
+    const tokenGroups = [];
+    if (transactions)
+      transactionGroups.push(transactions);
+    if (tokens)
+      tokenGroups.push(tokens);
+    console.log(transactionGroups)
+    return { transactionGroups, tokenGroups };
   }
 
   @Get('/bridge') // LayerZero Protocol (OFTP, ProxyOFT, Pancake, Stargate)
@@ -212,6 +227,47 @@ export class ApiController {
     const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
     const outputAmount = BigInt(parseInt(destinationLogs.data,16));
     const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": chain, "value": outputAmount.toString()};
+
+    const transactionGroups = [];
+    let transactions;
+    if(chain === 'BNB')
+      transactions = await this.getTokenTxByAddressInBNB(recipientAddress, String(destTx.blockNumber));
+    else if(chain === "Arbitrum")
+      transactions = await this.getTokenTxByAddressInArbitrum(recipientAddress, String(destTx.blockNumber));
+    if(transactions)
+      transactionGroups.push(transactions);
+    const response = [];
+    response.push({ "sourceTx": sourceTx, "destinationTx": destinationTx, "transactionGroups": transactionGroups });
+
+    console.log(response);
+    return response;
+  }
+
+  @Get('/layerzero') // LayerZero Protocol (Claim)
+  async getLayerZeroAccountTx(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
+    let destinationProvider: Provider
+    if(chain === "BNB")
+      destinationProvider = this.bnbProvider;
+    else if(chain === "Arbitrum")
+      destinationProvider = this.arbitrumProvider;
+
+    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+
+    const depositorAddress = layerData.source.tx.from;
+    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const layerZeroLogs = await this.getLayerZeroLogsInSource(srcTx.logs);
+    const recipientAddress = '0x' + layerZeroLogs.data.slice(26, 66);  // Extract the second 32 bytes (to address)
+    const zroAmountHex = '0x' + layerZeroLogs.data.slice(66, 130);  // Extract the third 32 bytes (zroAmount)
+    const inputAmount = BigInt(zroAmountHex);  // Convert zroAmount to BigInt
+
+    const sourceTx = {"address": depositorAddress, "id": 'ZRO', "name": 'LayerZero', "chain": "Mainnet", "value": inputAmount.toString()};
+
+    const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+
+    const destinationLogs = await this.getLayerZeroLogsInDestination(destTx.logs);
+    const actualAmountHex = '0x' + destinationLogs.data.slice(130, 194);
+    const outputAmount = BigInt(parseInt(actualAmountHex, 16));
+    const destinationTx = {"address": recipientAddress, "id": 'ZRO', "name": 'LayerZero', "chain": chain, "value": outputAmount.toString()};
 
     const transactionGroups = [];
     let transactions;
@@ -544,6 +600,18 @@ export class ApiController {
       .filter(log => log.topics[0] === transferCode)[0];
   }
 
+  private async getLayerZeroLogsInSource(logs) {
+    const transferCode = '0xa249b2de7880ddae7545b21bb8c53b5d091a775a6af75203985e48e2bde60760';
+    return logs
+      .filter(log => log.topics[0] === transferCode)[0];
+  }
+
+  private async getLayerZeroLogsInDestination(logs) {
+    const transferCode = '0x82e45245d12a20ddee81f5c5b25c8407b35b1f59ee3fce43c791e342b145b4e5';
+    return logs
+      .filter(log => log.topics[0] === transferCode)[0];
+  }
+
   private async getLiFiLogsInDestination(logs) {
     const transferCode = '0x3d52ff888d033fd3dd1d8057da59e850c91d91a72c41dfa445b247dfedeb6dc1';
     return logs
@@ -580,13 +648,15 @@ export class ApiController {
         })
       )
     );
+
     for (const tx of data.result)
       tx.chain = "BNB"; //구분을 위한 체인명 삽입
     if (data.message == "OK") {
       return data.result;
     }
     else {
-      return await this.getTxListByAddressInBNB(address, blockNumber);
+      console.log(data.message);
+      return '';
     }
   }
 
@@ -609,6 +679,7 @@ export class ApiController {
     }
     else {
       console.log(data.message);
+      return '';
     }
   }
 
@@ -629,9 +700,9 @@ export class ApiController {
       return data.result;
     }
     else {
-      return await this.getTxListByAddressInArbitrum(address, blockNumber);
+      console.log(data.message);
+      return '';
     }
-
   }
 
   private async getTxListByAddressInArbitrum(address: string, blockNumber: string) {
@@ -653,6 +724,7 @@ export class ApiController {
     }
     else {
       console.log(data.message);
+      return '';
     }
   }
 

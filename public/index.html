@@ -5,138 +5,141 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>InterChain Explorer</title>
   <style>
+      :root {
+          --primary-color: #4a90e2;
+          --secondary-color: #f5f5f5;
+          --text-color: #333;
+          --border-radius: 8px;
+          --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
       body {
-          font-family: Arial, sans-serif;
-          background-color: #f5f5f5;
+          font-family: 'Arial', sans-serif;
+          line-height: 1.6;
+          color: var(--text-color);
+          background-color: #f0f2f5;
           margin: 0;
+          padding: 0;
+      }
+
+      .container {
+          display: flex;
+          max-width: 1400px;
+          margin: 0 auto;
           padding: 20px;
       }
-      .container {
-          max-width: 1200px;
-          margin: 0 auto;
+
+      .input-section {
+          flex: 1;
+          margin-right: 20px;
       }
-      .card-container {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 20px;
+
+      .result-section {
+          flex: 2;
+      }
+
+      .card {
+          background-color: #fff;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          padding: 20px;
           margin-bottom: 20px;
       }
-      .card {
-          background-color: #ffffff;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          padding: 20px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-          flex: 1 1 calc(50% - 20px);
+
+      h1, h2, h3 {
+          color: var(--primary-color);
       }
-      .card h3 {
-          margin-top: 0;
-          font-size: 18px;
-          color: #333;
-      }
-      .status {
+
+      input[type="text"], .custom-dropdown {
+          width: 100%;
           padding: 10px;
-          border-radius: 4px;
-          background-color: #e7f3fe;
-          border: 1px solid #b3d4fc;
-          margin-top: 10px;
-          display: none;
-      }
-      .status.success {
-          background-color: #e7ffe7;
-          border-color: #b3fcb3;
-      }
-      .status.error {
-          background-color: #ffe7e7;
-          border-color: #fcb3b3;
-      }
-      .btn {
-          padding: 10px 15px;
+          margin-bottom: 10px;
+          border: 1px solid #ddd;
+          border-radius: var(--border-radius);
           font-size: 16px;
-          color: #fff;
-          background-color: #007bff;
+      }
+
+      .btn {
+          display: inline-block;
+          background-color: var(--primary-color);
+          color: white;
+          padding: 10px 15px;
           border: none;
-          border-radius: 4px;
+          border-radius: var(--border-radius);
           cursor: pointer;
+          font-size: 16px;
           transition: background-color 0.3s;
-          position: relative;
       }
+
       .btn:hover {
-          background-color: #0056b3;
+          background-color: #3a7bc8;
       }
+
+      .transaction-group {
+          background-color: #fff;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          padding: 20px;
+          margin-bottom: 20px;
+      }
+
+      .transaction {
+          border-bottom: 1px solid #eee;
+          padding-bottom: 15px;
+          margin-bottom: 15px;
+      }
+
+      .transaction:last-child {
+          border-bottom: none;
+      }
+
+      .transaction-table {
+          width: 100%;
+          border-collapse: collapse;
+      }
+
+      .transaction-table td {
+          padding: 8px;
+          border-bottom: 1px solid #eee;
+      }
+
+      .transaction-table tr:last-child td {
+          border-bottom: none;
+      }
+
       .loader {
-          display: none;
           border: 3px solid #f3f3f3;
-          border-top: 3px solid #007bff;
+          border-top: 3px solid var(--primary-color);
           border-radius: 50%;
-          width: 16px;
-          height: 16px;
+          width: 20px;
+          height: 20px;
           animation: spin 1s linear infinite;
+          display: none;
           margin-left: 10px;
+          vertical-align: middle;
       }
+
       @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
       }
-      input[type="text"] {
+
+      .status {
           padding: 10px;
-          width: calc(100% - 22px);
-          margin-bottom: 10px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-size: 16px;
-      }
-      .details-container {
-          margin-top: 20px;
-      }
-      .details-container h3 {
-          font-size: 22px;
-          margin-bottom: 10px;
-          color: #333;
-      }
-      .details-card {
-          background-color: #ffffff;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          padding: 20px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-      .details-card table {
-          width: 100%;
-          border-collapse: collapse;
-      }
-      .details-card th, .details-card td {
-          padding: 12px;
-          border: 1px solid #ddd;
-          text-align: left;
-      }
-      .details-card th {
-          background-color: #f2f2f2;
-          color: #333;
-      }
-      .details-card td {
-          color: #555;
-      }
-      .dropdown-container {
-          margin: 10px 0; /* Add some spacing between elements */
+          border-radius: var(--border-radius);
+          margin-top: 10px;
       }
 
-      .custom-dropdown {
-          width: 100%;
-          padding: 10px;
-          font-size: 16px;
-          border: 1px solid #ccc;
-          border-radius: 5px;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-          background-color: white;
-          appearance: none; /* Hide default arrow for more customization */
-          -webkit-appearance: none;
-          -moz-appearance: none;
+      .status.success {
+          background-color: #d4edda;
+          border-color: #c3e6cb;
+          color: #155724;
       }
 
-      .custom-dropdown:focus {
-          outline: none;
-          border-color: #007BFF;
+      .status.error {
+          background-color: #f8d7da;
+          border-color: #f5c6cb;
+          color: #721c24;
       }
   </style>
 </head>
@@ -144,155 +147,178 @@
 
 <div class="container">
 
+  <div class="input-section">
   <!-- BNB Transaction Check -->
-  <div class="card-container">
-    <div class="card">
-      <h3>OFT, Proxy OFT, Pancake, Stargate (Mainnet -> BNB or Arbitrum) Transactions</h3>
-      <input type="text" id="OFTTxHash" placeholder="Enter Source Transaction Hash" />
+    <div class="card-container">
 
-      <div class="dropdown-container">
-        <select id="chainOFT" class="custom-dropdown">
-          <option value="Mainnet">Mainnet</option>
-          <option value="BNB">BNB</option>
-          <option value="Arbitrum">Arbitrum</option>
-        </select>
+        <div class="card">
+          <h3>OFT, Proxy OFT, Pancake, Stargate (Mainnet -> BNB or Arbitrum) Transactions</h3>
+          <input type="text" id="OFTTxHash" placeholder="Enter Source Transaction Hash" />
+
+          <div class="dropdown-container">
+            <select id="chainOFT" class="custom-dropdown">
+              <option value="Mainnet">Mainnet</option>
+              <option value="BNB">BNB</option>
+              <option value="Arbitrum">Arbitrum</option>
+            </select>
+          </div>
+          <div>
+            <button class = "btn" id="showTokensBtn">토큰</button>
+            <button class = "btn" id="showTransactionsBtn">트랜잭션</button>
+          </div>
+          <hr>
+          <button class="btn" id="checkOFTTransactionsBtn" onclick="checkOFTTransactions()">Check Transactions <span id="checkOFTTransactionsLoader" class="loader"></span></button>
+          <div id="OFTTransactionsResult" class="status"></div>
+        </div>
+    </div>
+
+    <!-- Arbitrum Transaction Check -->
+    <div class="card-container">
+      <div class="card">
+        <h3>Across (Mainnet -> Arbitrum) Transactions</h3>
+        <input type="text" id="arbitrumTxHash" placeholder="Enter Source Transaction Hash" />
+        <button class="btn" id="checkArbitrumTransactionsBtn" onclick="checkArbitrumTransactions()">Check Transactions <span id="checkArbitrumTransactionsLoader" class="loader"></span></button>
+        <div id="arbitrumTransactionsResult" class="status"></div>
       </div>
-      <button class="btn" id="checkOFTTransactionsBtn" onclick="checkOFTTransactions()">Check Transactions <span id="checkOFTTransactionsLoader" class="loader"></span></button>
-      <div id="OFTTransactionsResult" class="status"></div>
     </div>
-  </div>
 
-  <!-- Arbitrum Transaction Check -->
-  <div class="card-container">
-    <div class="card">
-      <h3>Across (Mainnet -> Arbitrum) Transactions</h3>
-      <input type="text" id="arbitrumTxHash" placeholder="Enter Source Transaction Hash" />
-      <button class="btn" id="checkArbitrumTransactionsBtn" onclick="checkArbitrumTransactions()">Check Transactions <span id="checkArbitrumTransactionsLoader" class="loader"></span></button>
-      <div id="arbitrumTransactionsResult" class="status"></div>
-    </div>
-  </div>
+    <div class="card-container">
+      <div class="card">
+        <h3><b>Drive</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
+        <input type="text" id="driveTxHash" placeholder="Enter Source Transaction Hash" />
 
-  <div class="card-container">
-    <div class="card">
-      <h3><b>Drive</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-      <input type="text" id="driveTxHash" placeholder="Enter Source Transaction Hash" />
+        <!-- Custom-styled dropdown -->
+        <div class="dropdown-container">
+          <select id="chainDrive" class="custom-dropdown">
+            <option value="Mainnet">Mainnet</option>
+            <option value="BNB">BNB</option>
+            <option value="Arbitrum">Arbitrum</option>
+          </select>
+        </div>
 
-      <!-- Custom-styled dropdown -->
-      <div class="dropdown-container">
-        <select id="chainDrive" class="custom-dropdown">
-          <option value="Mainnet">Mainnet</option>
-          <option value="BNB">BNB</option>
-          <option value="Arbitrum">Arbitrum</option>
-        </select>
+        <button class="btn" id="checkDriveTransactionsBtn" onclick="checkDriveTransactions()">Check Transactions
+          <span id="checkDriveTransactionsLoader" class="loader"></span>
+        </button>
+        <div id="driveTransactionsResult" class="status"></div>
       </div>
-
-      <button class="btn" id="checkDriveTransactionsBtn" onclick="checkDriveTransactions()">Check Transactions
-        <span id="checkDriveTransactionsLoader" class="loader"></span>
-      </button>
-      <div id="driveTransactionsResult" class="status"></div>
     </div>
-  </div>
 
-  <div class="card-container">
-    <div class="card">
-      <h3><b>Claim</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-      <input type="text" id="claimTxHash" placeholder="Enter Source Transaction Hash" />
+    <div class="card-container">
+      <div class="card">
+        <h3><b>Claim</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
+        <input type="text" id="claimTxHash" placeholder="Enter Source Transaction Hash" />
 
-      <!-- Custom-styled dropdown -->
-      <div class="dropdown-container">
-        <select id="chainClaim" class="custom-dropdown">
-          <option value="Mainnet">Mainnet</option>
-          <option value="BNB">BNB</option>
-          <option value="Arbitrum">Arbitrum</option>
-        </select>
+        <!-- Custom-styled dropdown -->
+        <div class="dropdown-container">
+          <select id="chainClaim" class="custom-dropdown">
+            <option value="Mainnet">Mainnet</option>
+            <option value="BNB">BNB</option>
+            <option value="Arbitrum">Arbitrum</option>
+          </select>
+        </div>
+
+        <button class="btn" id="checkClaimTransactionsBtn" onclick="checkClaimTransactions()">Check Transactions
+          <span id="checkClaimTransactionsLoader" class="loader"></span>
+        </button>
+        <div id="claimTransactionsResult" class="status"></div>
       </div>
-
-      <button class="btn" id="checkClaimTransactionsBtn" onclick="checkClaimTransactions()">Check Transactions
-        <span id="checkClaimTransactionsLoader" class="loader"></span>
-      </button>
-      <div id="claimTransactionsResult" class="status"></div>
     </div>
-  </div>
 
-  <div class="card-container">
-    <div class="card">
-      <h3><b>Bridge</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-      <input type="text" id="bridgeTxHash" placeholder="Enter Source Transaction Hash" />
+    <div class="card-container">
+      <div class="card">
+        <h3><b>Bridge</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
+        <input type="text" id="bridgeTxHash" placeholder="Enter Source Transaction Hash" />
 
-      <!-- Custom-styled dropdown -->
-      <div class="dropdown-container">
-        <select id="chainBridge" class="custom-dropdown">
-          <option value="Mainnet">Mainnet</option>
-          <option value="BNB">BNB</option>
-          <option value="Arbitrum">Arbitrum</option>
-        </select>
+        <!-- Custom-styled dropdown -->
+        <div class="dropdown-container">
+          <select id="chainBridge" class="custom-dropdown">
+            <option value="Mainnet">Mainnet</option>
+            <option value="BNB">BNB</option>
+            <option value="Arbitrum">Arbitrum</option>
+          </select>
+        </div>
+
+        <button class="btn" id="checkBridgeTransactionsBtn" onclick="checkBridgeTransactions()">Check Transactions
+          <span id="checkBridgeTransactionsLoader" class="loader"></span>
+        </button>
+        <div id="bridgeTransactionsResult" class="status"></div>
       </div>
-
-      <button class="btn" id="checkBridgeTransactionsBtn" onclick="checkBridgeTransactions()">Check Transactions
-        <span id="checkBridgeTransactionsLoader" class="loader"></span>
-      </button>
-      <div id="bridgeTransactionsResult" class="status"></div>
     </div>
-  </div>
 
-  <div class="card-container">
-    <div class="card">
-      <h3><b>Li-fi</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-      <input type="text" id="lifiTxHash" placeholder="Enter Source Transaction Hash" />
+    <div class="card-container">
+      <div class="card">
+        <h3><b>LayerZero</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
+        <input type="text" id="layerzeroTxHash" placeholder="Enter Source Transaction Hash" />
 
-      <!-- Custom-styled dropdown -->
-      <div class="dropdown-container">
-        <select id="chainLifi" class="custom-dropdown">
-          <option value="Mainnet">Mainnet</option>
-          <option value="BNB">BNB</option>
-          <option value="Arbitrum">Arbitrum</option>
-        </select>
+        <!-- Custom-styled dropdown -->
+        <div class="dropdown-container">
+          <select id="chainLayerZero" class="custom-dropdown">
+            <option value="Mainnet">Mainnet</option>
+            <option value="BNB">BNB</option>
+            <option value="Arbitrum">Arbitrum</option>
+          </select>
+        </div>
+
+        <button class="btn" id="checkLayerZeroTransactionsBtn" onclick="checkLayerZeroTransactions()">Check Transactions
+          <span id="checkLayerZeroTransactionsLoader" class="loader"></span>
+        </button>
+        <div id="layerzeroTransactionsResult" class="status"></div>
       </div>
-
-      <button class="btn" id="checkLifiTransactionsBtn" onclick="checkLifiTransactions()">Check Transactions
-        <span id="checkLifiTransactionsLoader" class="loader"></span>
-      </button>
-      <div id="lifiTransactionsResult" class="status"></div>
     </div>
-  </div>
 
-  <div class="card-container">
-    <div class="card">
-      <h3><b>Rango</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-      <input type="text" id="rangoTxHash" placeholder="Enter Source Transaction Hash" />
+    <div class="card-container">
+      <div class="card">
+        <h3><b>Li-fi</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
+        <input type="text" id="lifiTxHash" placeholder="Enter Source Transaction Hash" />
 
-      <!-- Custom-styled dropdown -->
-      <div class="dropdown-container">
-        <select id="chainRango" class="custom-dropdown">
-          <option value="Mainnet">Mainnet</option>
-          <option value="BNB">BNB</option>
-          <option value="Arbitrum">Arbitrum</option>
-        </select>
+        <!-- Custom-styled dropdown -->
+        <div class="dropdown-container">
+          <select id="chainLifi" class="custom-dropdown">
+            <option value="Mainnet">Mainnet</option>
+            <option value="BNB">BNB</option>
+            <option value="Arbitrum">Arbitrum</option>
+          </select>
+        </div>
+
+        <button class="btn" id="checkLifiTransactionsBtn" onclick="checkLifiTransactions()">Check Transactions
+          <span id="checkLifiTransactionsLoader" class="loader"></span>
+        </button>
+        <div id="lifiTransactionsResult" class="status"></div>
       </div>
+    </div>
 
-      <button class="btn" id="checkRangoTransactionsBtn" onclick="checkRangoTransactions()">Check Transactions
-        <span id="checkRangoTransactionsLoader" class="loader"></span>
-      </button>
-      <div id="rangoTransactionsResult" class="status"></div>
+    <div class="card-container">
+      <div class="card">
+        <h3><b>Rango</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
+        <input type="text" id="rangoTxHash" placeholder="Enter Source Transaction Hash" />
+
+        <!-- Custom-styled dropdown -->
+        <div class="dropdown-container">
+          <select id="chainRango" class="custom-dropdown">
+            <option value="Mainnet">Mainnet</option>
+            <option value="BNB">BNB</option>
+            <option value="Arbitrum">Arbitrum</option>
+          </select>
+        </div>
+
+        <button class="btn" id="checkRangoTransactionsBtn" onclick="checkRangoTransactions()">Check Transactions
+          <span id="checkRangoTransactionsLoader" class="loader"></span>
+        </button>
+        <div id="rangoTransactionsResult" class="status"></div>
+      </div>
     </div>
   </div>
 
 
-  <!-- Transaction Details Table -->
-  <div id="transactionDetails" class="details-container" style="display: none;">
-    <h3>Transaction Details</h3>
-    <div class="details-card">
-      <table>
-        <thead>
-        <tr>
-          <th>Field</th>
-          <th>Value</th>
-        </tr>
-        </thead>
-        <tbody id="transactionDetailsBody">
-        <!-- Data rows will be inserted here by JavaScript -->
-        </tbody>
-      </table>
+  <div class="result-section">
+    <div id="transactionDetails" class="details-container" style="display: none;">
+      <div class="details-card">
+        <table>
+          <tbody id="transactionDetailsBody">
+          <!-- Data rows will be inserted here by JavaScript -->
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -313,7 +339,19 @@
         // Assuming the response is an array of transactions
         if (result.length > 0) {
           // Loop through each transaction and display the details
-          displayMultipleTransactionGroups(result);
+          // 기본적으로 tokenGroups를 먼저 표시
+          displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+          });
+
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
         } else {
@@ -343,7 +381,18 @@
         const result = await response.json();
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result);
+          displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+          });
+
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
         } else {
@@ -376,7 +425,62 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result);
+          displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+          });
+
+          resultDiv.textContent = 'Transaction details fetched successfully.';
+          resultDiv.className = 'status success';
+        } else {
+          resultDiv.textContent = 'No transaction details found.';
+          resultDiv.className = 'status error';
+        }
+      } catch (error) {
+        resultDiv.textContent = 'Error checking transactions: ' + error.message;
+        resultDiv.className = 'status error';
+      } finally {
+        button.disabled = false;
+        loader.style.display = 'none';
+      }
+    }
+
+    async function checkLayerZeroTransactions() {
+      const txHash = document.getElementById('layerzeroTxHash').value;
+      const chain = document.getElementById('chainLayerZero').value;
+
+      const button = document.getElementById('checkLayerZeroTransactionsBtn');
+      const loader = document.getElementById('checkLayerZeroTransactionsLoader');
+      const resultDiv = document.getElementById('layerzeroTransactionsResult');
+
+      button.disabled = true;
+      loader.style.display = 'inline-block';
+
+      try {
+        const response = await fetch(`/api/layerzero?srcTxHash=${txHash}&chain=${chain}`);
+        const result = await response.json();
+
+        // Assuming the response is an array of transactions
+        if (result.length > 0) {
+          displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+          });
+
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
         } else {
@@ -409,7 +513,18 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result);
+          displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+          });
+
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
         } else {
@@ -442,7 +557,18 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result);
+          displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+          });
+
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
         } else {
@@ -475,7 +601,18 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result);
+          displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+          });
+
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
         } else {
@@ -507,7 +644,18 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result);
+          displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+          });
+
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
         } else {
@@ -544,27 +692,27 @@
       'wstETH' : "https://etherscan.io/token/images/wsteth3_32.png",
       'Cake' : "https://bscscan.com/token/images/pancake_32.png?=v1",
       "OMNI": "https://arbiscan.io/token/images/omnicat_32.png",
+      'BUSD' : 'https://bscscan.com/token/images/busd_32_2.png',
       'unknown' : "/unknown.png",
       'ETH' : "/eth.webp"
       // 다른 토큰 심볼과 로고를 여기 추가
     };
 
-    function displayMultipleTransactionGroups(data) {
+    function displayMultipleTransactionGroups(data, type) {
       const container = document.getElementById('transactionDetailsBody');
       container.innerHTML = ''; // 기존 내용을 지웁니다.
 
       const { sourceTx, destinationTx } = data[0];
-      const transactionGroups = data[0].transactionGroups; // 참조 변수 수정
+      let transactionGroups;
+      if(type === 'tokenGroups')
+        transactionGroups = data[0].tokenGroups; // 참조 변수 수정
+      else
+        transactionGroups = data[0].transactionGroups;
 
       transactionGroups.forEach((transactions, groupIndex) => {
         // 트랜잭션 그룹에 대한 wrapper div 생성
         const groupDiv = document.createElement('div');
         groupDiv.className = 'transaction-group';
-
-        // 각 그룹에 대한 제목 추가
-        const groupTitle = document.createElement('h2');
-        groupTitle.textContent = `Transaction Group #${groupIndex + 1}`;
-        groupDiv.appendChild(groupTitle);
 
         transactions.forEach((transaction, index) => {
           // 각 트랜잭션에 대한 wrapper div 생성
@@ -579,7 +727,6 @@
             bridgeTitle.style.color = '#ff5733'; // 예를 들어, 색상 변경
             bridgeTitle.style.borderBottom = '2px solid #ff5733'; // 하단에 구분선 추가
             transactionDiv.appendChild(bridgeTitle);
-
             // 브릿지 트랜잭션에 대한 스타일링
             transactionDiv.style.backgroundColor = '#f9f9f9';
             transactionDiv.style.padding = '10px';
@@ -628,32 +775,64 @@
 
 
           // 필드 및 해당 값을 정의
-          const fields = [
-            {
-              label: 'From',
-              value: `<a href="${explorerBaseURL}/address/${transaction.from}" target="_blank">${transaction.from}</a>`
-            },
-            {
-              label: 'To',
-              value: `<a href="${explorerBaseURL}/address/${transaction.to}" target="_blank">${transaction.to}</a>`
-            },
-            {
-              label: 'Value',
-              value: Number((BigInt(transaction.value) / BigInt(1e18)).toString()).toFixed(5) + ' Token'
-            },
-            {
-              label: 'Timestamp',
-              value: new Date(transaction.timeStamp * 1000).toLocaleString()
-            },
-            {
-              label: 'Transaction Hash',
-              value: `<a href="${explorerBaseURL}/tx/${transaction.hash}" target="_blank">${transaction.hash}</a>`
-            },
-            {
-              label: 'Token',
-              value: `<img src="${tokenLogos[transaction.tokenSymbol]}" alt="${transaction.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${transaction.tokenName} (${transaction.tokenSymbol})`
-            }
-          ];
+          let fields;
+          if (type === 'tokenGroups') {
+            // tokenGroups일 때 기존 필드 구조
+            fields = [
+              {
+                label: 'From',
+                value: `<a href="${explorerBaseURL}/address/${transaction.from}" target="_blank">${transaction.from}</a>`
+              },
+              {
+                label: 'To',
+                value: `<a href="${explorerBaseURL}/address/${transaction.to}" target="_blank">${transaction.to}</a>`
+              },
+              {
+                label: 'Value',
+                value: Number((BigInt(transaction.value) / BigInt(1e18)).toString()).toFixed(5) + ' Token'
+              },
+              {
+                label: 'Timestamp',
+                value: new Date(transaction.timeStamp * 1000).toLocaleString()
+              },
+              {
+                label: 'Transaction Hash',
+                value: `<a href="${explorerBaseURL}/tx/${transaction.hash}" target="_blank">${transaction.hash}</a>`
+              },
+              {
+                label: 'Token',
+                value: `<img src="${tokenLogos[transaction.tokenSymbol]}" alt="${transaction.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${transaction.tokenName} (${transaction.tokenSymbol})`
+              }
+            ];
+          } else {
+            // transactionGroups일 때 필드 구조 변경
+            fields = [
+              {
+                label: 'Function Name',
+                value: `<span style="font-weight: bold; color: #FF5722;">${transaction.functionName || 'N/A'}</span>`
+              },
+              {
+                label: 'From',
+                value: `<a href="${explorerBaseURL}/address/${transaction.from}" target="_blank">${transaction.from}</a>`
+              },
+              {
+                label: 'To',
+                value: `<a href="${explorerBaseURL}/address/${transaction.to}" target="_blank">${transaction.to}</a>`
+              },
+              {
+                label: 'Value',
+                value: Number((BigInt(transaction.value) / BigInt(1e18)).toString()).toFixed(5) + ' ETH'
+              },
+              {
+                label: 'Timestamp',
+                value: new Date(transaction.timeStamp * 1000).toLocaleString()
+              },
+              {
+                label: 'Transaction Hash',
+                value: `<a href="${explorerBaseURL}/tx/${transaction.hash}" target="_blank">${transaction.hash}</a>`
+              }
+            ];
+          }
 
           // 테이블에 행 추가
           fields.forEach(field => {
