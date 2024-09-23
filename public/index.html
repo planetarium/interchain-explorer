@@ -340,7 +340,10 @@
         if (result.length > 0) {
           // Loop through each transaction and display the details
           // 기본적으로 tokenGroups를 먼저 표시
-          displayMultipleTransactionGroups(result, 'tokenGroups');
+          if(result.tokenGroups)
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          else
+            displayMultipleTransactionGroups(result, 'transactionGroups')
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -381,7 +384,10 @@
         const result = await response.json();
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result, 'tokenGroups');
+          if(result.tokenGroups)
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          else
+            displayMultipleTransactionGroups(result, 'transactionGroups')
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -425,7 +431,10 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result, 'tokenGroups');
+          if(result.tokenGroups)
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          else
+            displayMultipleTransactionGroups(result, 'transactionGroups')
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -469,7 +478,10 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result, 'tokenGroups');
+          if(result.tokenGroups)
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          else
+            displayMultipleTransactionGroups(result, 'transactionGroups')
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -513,7 +525,10 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result, 'tokenGroups');
+          if(result.tokenGroups)
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          else
+            displayMultipleTransactionGroups(result, 'transactionGroups')
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -557,7 +572,10 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result, 'tokenGroups');
+          if(result.tokenGroups)
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          else
+            displayMultipleTransactionGroups(result, 'transactionGroups')
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -601,7 +619,10 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result, 'tokenGroups');
+          if(result.tokenGroups)
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          else
+            displayMultipleTransactionGroups(result, 'transactionGroups')
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -644,7 +665,10 @@
 
         // Assuming the response is an array of transactions
         if (result.length > 0) {
-          displayMultipleTransactionGroups(result, 'tokenGroups');
+          if(result.tokenGroups)
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+          else
+            displayMultipleTransactionGroups(result, 'transactionGroups')
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -723,7 +747,7 @@
           // 각 트랜잭션에 대한 제목 추가
           if (index === 0) {
             const bridgeTitle = document.createElement('h3');
-            bridgeTitle.textContent = `Bridge Transaction`;
+            bridgeTitle.textContent = `Most Recent Transaction`;
             bridgeTitle.style.color = '#ff5733'; // 예를 들어, 색상 변경
             bridgeTitle.style.borderBottom = '2px solid #ff5733'; // 하단에 구분선 추가
             transactionDiv.appendChild(bridgeTitle);
@@ -809,7 +833,7 @@
             fields = [
               {
                 label: 'Function Name',
-                value: `<span style="font-weight: bold; color: #FF5722;">${transaction.functionName || 'N/A'}</span>`
+                value: `<span style="font-weight: bold; color: #FF5722;">${transaction.functionName || 'Transfer'}</span>`
               },
               {
                 label: 'From',
