@@ -1,9 +1,19 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
-import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, TransactionDescription, TransactionReceipt } from "ethers";
-import { catchError, firstValueFrom } from "rxjs";
+import {
+  Contract,
+  ethers,
+  EtherscanProvider,
+  InfuraProvider,
+  Provider,
+  Transaction,
+  TransactionDescription,
+  TransactionReceipt
+} from "ethers";
+import { catchError, firstValueFrom, Observable } from "rxjs";
 import { AxiosError } from "axios";
+import { MethodMapperService } from "../common/method-mapper.service";
 
 
 @Injectable()
@@ -16,13 +26,50 @@ export class ApiService {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly methodMapperService: MethodMapperService,
   ) {}
 
-  async getRecipientTxListFromOFT(srcTxHash: string, chain: string) {
+  async selectLogicAndGetRecipientActivities(srcTxHash: string, chain: string) {
+    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const methodId = this.getMethodId(srcTx);
+    if(methodId === undefined)
+      return '미구현';
+    const methodName = this.methodMapperService.getMethodName(methodId);
+
+    return this.getRecipientActivities(methodName, srcTxHash, chain)
+  }
+
+  async getRecipientActivities(methodName: string, srcTxHash: string, chain: string) {
+    if (methodName === undefined)
+      return;
+    if (methodName === "Drive Bus")
+      return this.getRecipientTxListFromDrive(srcTxHash, chain);
+    else if (methodName === "stargateSwapAndBridge")
+      return this.getRecipientTxListFromRango(srcTxHash, chain);
+    else if (methodName === "swapAndStartBridgeTokensViaStargate")
+      return this.getRecipientTxListFromLifi(srcTxHash, chain);
+    else if (methodName === "claim")
+      return this.getRecipientTxListFromClaim(srcTxHash, chain);
+    else if (methodName === "donateAndClaim")
+      return this.getRecipientTxListFromLayerZero(srcTxHash, chain);
+    else if (methodName === "swapAndBridge")
+      return this.getRecipientTxListFromBridge(srcTxHash, chain);
+    else if (methodName === "deposit")
+      return this.getRecipientTxListFromAcross(srcTxHash, chain);
+    else if (methodName === "send" || "sendFrom" || "sendOFT" || "sendOFTV2" || "swapBridgeToV2" || "sendProxyOFTV2")
+      return this.getRecipientTxListFromOFT(srcTxHash, chain);
+    else
+      return '';
+  }
+
+
+
+
+  async getRecipientTxListFromOFT(srcTxHash: string, chain: string) { //src: 인풋, 로그 / dest: 로그
     const destinationProvider = this.selectProvider(chain);
 
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
-    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
     const depositorAddress = layerData.source.tx.from;
     const abi = await this.getTxABIInMainnet(srcTx);
 
@@ -68,11 +115,11 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromBridge(srcTxHash: string, chain: string) {
+  async getRecipientTxListFromBridge(srcTxHash: string, chain: string) { //src: 인풋, 로그 / dest: 로그
     const destinationProvider = this.selectProvider(chain);
 
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
-    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
     const depositorAddress = layerData.source.tx.from;
     const abi = await this.getTxABIInMainnet(srcTx);
 
@@ -119,12 +166,12 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromClaim(srcTxHash: string, chain: string) {
+  async getRecipientTxListFromClaim(srcTxHash: string, chain: string) { //src: 로그 / dest: 로그
     const destinationProvider = this.selectProvider(chain);
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
 
     const depositorAddress = layerData.source.tx.from;
-    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
     const claimLogs = await this.getClaimLogsInSource(srcTx.logs);
     const recipientAddress = '0x' + claimLogs.data.slice(0, 66).slice(-40);  // First 32 bytes
     // const inputAmountHex = '0x' + claimLogs.data.slice(66);  // Second 32 bytes
@@ -145,12 +192,12 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromLayerZero(srcTxHash: string, chain: string) {
+  async getRecipientTxListFromLayerZero(srcTxHash: string, chain: string) { //src: 커스텀 로그 / dest: 커스텀 로그
     const destinationProvider = this.selectProvider(chain);
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
 
     const depositorAddress = layerData.source.tx.from;
-    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
     const layerZeroLogs = await this.getLayerZeroLogsInSource(srcTx.logs);
     const recipientAddress = '0x' + layerZeroLogs.data.slice(26, 66);  // Extract the second 32 bytes (to address)
     const zroAmountHex = '0x' + layerZeroLogs.data.slice(66, 130);  // Extract the third 32 bytes (zroAmount)
@@ -172,13 +219,14 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromDrive(srcTxHash: string, chain: string) {
+  async getRecipientTxListFromDrive(srcTxHash: string, chain: string) { //src: 로그 / dest: 로그
     const destinationProvider = this.selectProvider(chain);
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
-
+    const srcTx = await this.getTxInMainnet(srcTxHash);
     const depositorAddress = layerData.source.tx.from;
-    const sourceTx = {"address": depositorAddress, "id": "X", "name": "X", "chain": "Mainnet", "value": "0"};
+    const sourceTx = {"address": depositorAddress, "id": "ETH", "name": "ETH", "chain": "Mainnet", "value": parseInt(srcTx.value.toString(),16).toString()};
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+
     const destinationLogs = await this.getTransferLogsInDestination("", destTx.logs);
     let destinationTx, recipientAddress, outputAmount;
 
@@ -204,11 +252,11 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromLifi(srcTxHash: string, chain: string) {
+  async getRecipientTxListFromLifi(srcTxHash: string, chain: string) { //src: 로그 / dest: 로그
     const destinationProvider = this.selectProvider(chain);
 
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
-    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
 
     const depositorAddress = layerData.source.tx.from;
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
@@ -236,7 +284,7 @@ export class ApiService {
   async getRecipientTxListFromRango(srcTxHash: string, chain: string) {
     const destinationProvider = this.selectProvider(chain);
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
-    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
 
     const depositorAddress = layerData.source.tx.from;
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
@@ -262,7 +310,7 @@ export class ApiService {
   }
 
   async getRecipientTxListFromAcross(srcTxHash: string, chain: string) { /** Across 프로토콜은 조금 다름 **/
-    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
 
     const log = srcTx.logs.find(log => log.address === '0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5'); // Across Protocol
     const decodedLogData = await this.getDecodedLogsForAcrossProtocol(log);
@@ -420,7 +468,25 @@ export class ApiService {
     return abi;
   }
 
-  private async getTxInMainnet(txHash: string): Promise<null | TransactionReceipt>{
+  private async getTxInMainnet(txHash: string): Promise<null | Transaction>{
+    const requestBody = {
+      jsonrpc: "2.0",
+      method: "eth_getTransactionByHash",
+      params: [`${txHash}`],
+      id: 1
+    };
+    const { data } = await firstValueFrom(
+      this.httpService.post(this.mainnetUrl, requestBody).pipe(
+        catchError((error: AxiosError) => {
+          console.log("Error fetching transaction history:", error.message);
+          throw new Error("An error occurred while fetching transaction history.");
+        })
+      )
+    );
+    return data.result;
+  }
+
+  private async getTxReceiptInMainnet(txHash: string): Promise<null | TransactionReceipt>{
     const requestBody = {
       jsonrpc: "2.0",
       method: "eth_getTransactionReceipt",
@@ -656,4 +722,8 @@ export class ApiService {
     return response;
   }
 
+  private getMethodId(srcTx) {
+    const inputData = srcTx.input; // 트랜잭션의 input data
+    return inputData.slice(0, 10); // 첫 10글자를 MethodID로 추출 (0x + 4바이트)
+  }
 }

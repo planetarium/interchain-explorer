@@ -71,6 +71,12 @@
           transition: background-color 0.3s;
       }
 
+      .btn.active {
+          background-color: #007bff;
+          color: white;
+      }
+
+
       .btn:hover {
           background-color: #3a7bc8;
       }
@@ -152,163 +158,27 @@
     <div class="card-container">
 
         <div class="card">
-          <h3>OFT, Proxy OFT, Pancake, Stargate (Mainnet -> BNB or Arbitrum) Transactions</h3>
-          <input type="text" id="OFTTxHash" placeholder="Enter Source Transaction Hash" />
+          <h3>통합 조회</h3>
+          <input type="text" id="txHash" placeholder="Enter Source Transaction Hash" />
 
           <div class="dropdown-container">
-            <select id="chainOFT" class="custom-dropdown">
+            <select id="chain" class="custom-dropdown">
               <option value="Mainnet">Mainnet</option>
               <option value="BNB">BNB</option>
               <option value="Arbitrum">Arbitrum</option>
             </select>
           </div>
           <div>
-            <button class = "btn" id="showTokensBtn">토큰</button>
+            <button class = "btn active" id="showTokensBtn">토큰</button>
             <button class = "btn" id="showTransactionsBtn">트랜잭션</button>
           </div>
           <hr>
-          <button class="btn" id="checkOFTTransactionsBtn" onclick="checkOFTTransactions()">Check Transactions <span id="checkOFTTransactionsLoader" class="loader"></span></button>
-          <div id="OFTTransactionsResult" class="status"></div>
+          <button class="btn" id="getTransactionsBtn" onclick="getTransactions()">Check Transactions <span id="getTransactionsLoader" class="loader"></span></button>
+          <div id="transactionsResult" class="status"></div>
         </div>
-    </div>
-
-    <!-- Arbitrum Transaction Check -->
-    <div class="card-container">
-      <div class="card">
-        <h3>Across (Mainnet -> Arbitrum) Transactions</h3>
-        <input type="text" id="arbitrumTxHash" placeholder="Enter Source Transaction Hash" />
-        <button class="btn" id="checkArbitrumTransactionsBtn" onclick="checkArbitrumTransactions()">Check Transactions <span id="checkArbitrumTransactionsLoader" class="loader"></span></button>
-        <div id="arbitrumTransactionsResult" class="status"></div>
-      </div>
-    </div>
-
-    <div class="card-container">
-      <div class="card">
-        <h3><b>Drive</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-        <input type="text" id="driveTxHash" placeholder="Enter Source Transaction Hash" />
-
-        <!-- Custom-styled dropdown -->
-        <div class="dropdown-container">
-          <select id="chainDrive" class="custom-dropdown">
-            <option value="Mainnet">Mainnet</option>
-            <option value="BNB">BNB</option>
-            <option value="Arbitrum">Arbitrum</option>
-          </select>
-        </div>
-
-        <button class="btn" id="checkDriveTransactionsBtn" onclick="checkDriveTransactions()">Check Transactions
-          <span id="checkDriveTransactionsLoader" class="loader"></span>
-        </button>
-        <div id="driveTransactionsResult" class="status"></div>
-      </div>
-    </div>
-
-    <div class="card-container">
-      <div class="card">
-        <h3><b>Claim</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-        <input type="text" id="claimTxHash" placeholder="Enter Source Transaction Hash" />
-
-        <!-- Custom-styled dropdown -->
-        <div class="dropdown-container">
-          <select id="chainClaim" class="custom-dropdown">
-            <option value="Mainnet">Mainnet</option>
-            <option value="BNB">BNB</option>
-            <option value="Arbitrum">Arbitrum</option>
-          </select>
-        </div>
-
-        <button class="btn" id="checkClaimTransactionsBtn" onclick="checkClaimTransactions()">Check Transactions
-          <span id="checkClaimTransactionsLoader" class="loader"></span>
-        </button>
-        <div id="claimTransactionsResult" class="status"></div>
-      </div>
-    </div>
-
-    <div class="card-container">
-      <div class="card">
-        <h3><b>Bridge</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-        <input type="text" id="bridgeTxHash" placeholder="Enter Source Transaction Hash" />
-
-        <!-- Custom-styled dropdown -->
-        <div class="dropdown-container">
-          <select id="chainBridge" class="custom-dropdown">
-            <option value="Mainnet">Mainnet</option>
-            <option value="BNB">BNB</option>
-            <option value="Arbitrum">Arbitrum</option>
-          </select>
-        </div>
-
-        <button class="btn" id="checkBridgeTransactionsBtn" onclick="checkBridgeTransactions()">Check Transactions
-          <span id="checkBridgeTransactionsLoader" class="loader"></span>
-        </button>
-        <div id="bridgeTransactionsResult" class="status"></div>
-      </div>
-    </div>
-
-    <div class="card-container">
-      <div class="card">
-        <h3><b>LayerZero</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-        <input type="text" id="layerzeroTxHash" placeholder="Enter Source Transaction Hash" />
-
-        <!-- Custom-styled dropdown -->
-        <div class="dropdown-container">
-          <select id="chainLayerZero" class="custom-dropdown">
-            <option value="Mainnet">Mainnet</option>
-            <option value="BNB">BNB</option>
-            <option value="Arbitrum">Arbitrum</option>
-          </select>
-        </div>
-
-        <button class="btn" id="checkLayerZeroTransactionsBtn" onclick="checkLayerZeroTransactions()">Check Transactions
-          <span id="checkLayerZeroTransactionsLoader" class="loader"></span>
-        </button>
-        <div id="layerzeroTransactionsResult" class="status"></div>
-      </div>
-    </div>
-
-    <div class="card-container">
-      <div class="card">
-        <h3><b>Li-fi</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-        <input type="text" id="lifiTxHash" placeholder="Enter Source Transaction Hash" />
-
-        <!-- Custom-styled dropdown -->
-        <div class="dropdown-container">
-          <select id="chainLifi" class="custom-dropdown">
-            <option value="Mainnet">Mainnet</option>
-            <option value="BNB">BNB</option>
-            <option value="Arbitrum">Arbitrum</option>
-          </select>
-        </div>
-
-        <button class="btn" id="checkLifiTransactionsBtn" onclick="checkLifiTransactions()">Check Transactions
-          <span id="checkLifiTransactionsLoader" class="loader"></span>
-        </button>
-        <div id="lifiTransactionsResult" class="status"></div>
-      </div>
-    </div>
-
-    <div class="card-container">
-      <div class="card">
-        <h3><b>Rango</b> (Mainnet -> BNB or Arbitrum) Transactions</h3>
-        <input type="text" id="rangoTxHash" placeholder="Enter Source Transaction Hash" />
-
-        <!-- Custom-styled dropdown -->
-        <div class="dropdown-container">
-          <select id="chainRango" class="custom-dropdown">
-            <option value="Mainnet">Mainnet</option>
-            <option value="BNB">BNB</option>
-            <option value="Arbitrum">Arbitrum</option>
-          </select>
-        </div>
-
-        <button class="btn" id="checkRangoTransactionsBtn" onclick="checkRangoTransactions()">Check Transactions
-          <span id="checkRangoTransactionsLoader" class="loader"></span>
-        </button>
-        <div id="rangoTransactionsResult" class="status"></div>
-      </div>
     </div>
   </div>
-
+    <!-- Arbitrum Transaction Check -->
 
   <div class="result-section">
     <div id="transactionDetails" class="details-container" style="display: none;">
@@ -322,37 +192,45 @@
     </div>
   </div>
 
+
   <script>
-    async function checkOFTTransactions() {
-      const txHash = document.getElementById('OFTTxHash').value;
-      const chain = document.getElementById('chainOFT').value;
-      const button = document.getElementById('checkOFTTransactionsBtn');
-      const loader = document.getElementById('checkOFTTransactionsLoader');
-      const resultDiv = document.getElementById('OFTTransactionsResult');
+    async function getTransactions() {
+      const txHash = document.getElementById('txHash').value;
+      const chain = document.getElementById('chain').value;
+      const button = document.getElementById('getTransactionsBtn');
+      const loader = document.getElementById('getTransactionsLoader');
+      const resultDiv = document.getElementById('transactionsResult');
 
       button.disabled = true;
       loader.style.display = 'inline-block';
 
       try {
-        const response = await fetch(`/api/oft?srcTxHash=${txHash}&chain=${chain}`);
+        const response = await fetch(`/api/list?srcTxHash=${txHash}&chain=${chain}`);
         const result = await response.json();
         // Assuming the response is an array of transactions
         if (result.length > 0) {
           // Loop through each transaction and display the details
           // 기본적으로 tokenGroups를 먼저 표시
-          if(result.tokenGroups)
+          if (result.tokenGroups) {
             displayMultipleTransactionGroups(result, 'tokenGroups');
+            document.getElementById('showTokensBtn').classList.add('active');
+          }
+
           else
-            displayMultipleTransactionGroups(result, 'transactionGroups')
+            displayMultipleTransactionGroups(result, 'transactionGroups');
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
             displayMultipleTransactionGroups(result, 'tokenGroups');
+            document.getElementById('showTokensBtn').classList.add('active');
+            document.getElementById('showTransactionsBtn').classList.remove('active');
           });
 
           // 트랜잭션 버튼 클릭 시 transactionGroups 표시
           document.getElementById('showTransactionsBtn').addEventListener('click', () => {
             displayMultipleTransactionGroups(result, 'transactionGroups');
+            document.getElementById('showTransactionsBtn').classList.add('active');
+            document.getElementById('showTokensBtn').classList.remove('active');
           });
 
           resultDiv.textContent = 'Transaction details fetched successfully.';
@@ -363,331 +241,6 @@
         }
       } catch (error) {
         resultDiv.textContent = 'Error checking BNB transactions: ' + error.message;
-        resultDiv.className = 'status error';
-      } finally {
-        button.disabled = false;
-        loader.style.display = 'none';
-      }
-    }
-
-    async function checkArbitrumTransactions() {
-      const txHash = document.getElementById('arbitrumTxHash').value;
-      const button = document.getElementById('checkArbitrumTransactionsBtn');
-      const loader = document.getElementById('checkArbitrumTransactionsLoader');
-      const resultDiv = document.getElementById('arbitrumTransactionsResult');
-
-      button.disabled = true;
-      loader.style.display = 'inline-block';
-
-      try {
-        const response = await fetch(`/api/arbitrum?srcTxHash=${txHash}`);
-        const result = await response.json();
-        // Assuming the response is an array of transactions
-        if (result.length > 0) {
-          if(result.tokenGroups)
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          else
-            displayMultipleTransactionGroups(result, 'transactionGroups')
-
-          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
-          document.getElementById('showTokensBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          });
-
-          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
-          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-          });
-
-          resultDiv.textContent = 'Transaction details fetched successfully.';
-          resultDiv.className = 'status success';
-        } else {
-          resultDiv.textContent = 'No transaction details found.';
-          resultDiv.className = 'status error';
-        }
-      } catch (error) {
-        resultDiv.textContent = 'Error checking Arbitrum transactions: ' + error.message;
-        resultDiv.className = 'status error';
-      } finally {
-        button.disabled = false;
-        loader.style.display = 'none';
-      }
-    }
-
-    async function checkBridgeTransactions() {
-      const txHash = document.getElementById('bridgeTxHash').value;
-      const chain = document.getElementById('chainBridge').value;
-
-      const button = document.getElementById('checkBridgeTransactionsBtn');
-      const loader = document.getElementById('checkBridgeTransactionsLoader');
-      const resultDiv = document.getElementById('bridgeTransactionsResult');
-
-      button.disabled = true;
-      loader.style.display = 'inline-block';
-
-      try {
-        const response = await fetch(`/api/bridge?srcTxHash=${txHash}&chain=${chain}`);
-        const result = await response.json();
-
-        // Assuming the response is an array of transactions
-        if (result.length > 0) {
-          if(result.tokenGroups)
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          else
-            displayMultipleTransactionGroups(result, 'transactionGroups')
-
-          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
-          document.getElementById('showTokensBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          });
-
-          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
-          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-          });
-
-          resultDiv.textContent = 'Transaction details fetched successfully.';
-          resultDiv.className = 'status success';
-        } else {
-          resultDiv.textContent = 'No transaction details found.';
-          resultDiv.className = 'status error';
-        }
-      } catch (error) {
-        resultDiv.textContent = 'Error checking transactions: ' + error.message;
-        resultDiv.className = 'status error';
-      } finally {
-        button.disabled = false;
-        loader.style.display = 'none';
-      }
-    }
-
-    async function checkLayerZeroTransactions() {
-      const txHash = document.getElementById('layerzeroTxHash').value;
-      const chain = document.getElementById('chainLayerZero').value;
-
-      const button = document.getElementById('checkLayerZeroTransactionsBtn');
-      const loader = document.getElementById('checkLayerZeroTransactionsLoader');
-      const resultDiv = document.getElementById('layerzeroTransactionsResult');
-
-      button.disabled = true;
-      loader.style.display = 'inline-block';
-
-      try {
-        const response = await fetch(`/api/layerzero?srcTxHash=${txHash}&chain=${chain}`);
-        const result = await response.json();
-
-        // Assuming the response is an array of transactions
-        if (result.length > 0) {
-          if(result.tokenGroups)
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          else
-            displayMultipleTransactionGroups(result, 'transactionGroups')
-
-          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
-          document.getElementById('showTokensBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          });
-
-          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
-          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-          });
-
-          resultDiv.textContent = 'Transaction details fetched successfully.';
-          resultDiv.className = 'status success';
-        } else {
-          resultDiv.textContent = 'No transaction details found.';
-          resultDiv.className = 'status error';
-        }
-      } catch (error) {
-        resultDiv.textContent = 'Error checking transactions: ' + error.message;
-        resultDiv.className = 'status error';
-      } finally {
-        button.disabled = false;
-        loader.style.display = 'none';
-      }
-    }
-
-    async function checkClaimTransactions() {
-      const txHash = document.getElementById('claimTxHash').value;
-      const chain = document.getElementById('chainClaim').value;
-
-      const button = document.getElementById('checkClaimTransactionsBtn');
-      const loader = document.getElementById('checkClaimTransactionsLoader');
-      const resultDiv = document.getElementById('claimTransactionsResult');
-
-      button.disabled = true;
-      loader.style.display = 'inline-block';
-
-      try {
-        const response = await fetch(`/api/claim?srcTxHash=${txHash}&chain=${chain}`);
-        const result = await response.json();
-
-        // Assuming the response is an array of transactions
-        if (result.length > 0) {
-          if(result.tokenGroups)
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          else
-            displayMultipleTransactionGroups(result, 'transactionGroups')
-
-          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
-          document.getElementById('showTokensBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          });
-
-          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
-          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-          });
-
-          resultDiv.textContent = 'Transaction details fetched successfully.';
-          resultDiv.className = 'status success';
-        } else {
-          resultDiv.textContent = 'No transaction details found.';
-          resultDiv.className = 'status error';
-        }
-      } catch (error) {
-        resultDiv.textContent = 'Error checking transactions: ' + error.message;
-        resultDiv.className = 'status error';
-      } finally {
-        button.disabled = false;
-        loader.style.display = 'none';
-      }
-    }
-
-    async function checkDriveTransactions() {
-      const txHash = document.getElementById('driveTxHash').value;
-      const chain = document.getElementById('chainDrive').value;
-
-      const button = document.getElementById('checkDriveTransactionsBtn');
-      const loader = document.getElementById('checkDriveTransactionsLoader');
-      const resultDiv = document.getElementById('driveTransactionsResult');
-
-      button.disabled = true;
-      loader.style.display = 'inline-block';
-
-      try {
-        const response = await fetch(`/api/drive?srcTxHash=${txHash}&chain=${chain}`);
-        const result = await response.json();
-
-        // Assuming the response is an array of transactions
-        if (result.length > 0) {
-          if(result.tokenGroups)
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          else
-            displayMultipleTransactionGroups(result, 'transactionGroups')
-
-          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
-          document.getElementById('showTokensBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          });
-
-          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
-          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-          });
-
-          resultDiv.textContent = 'Transaction details fetched successfully.';
-          resultDiv.className = 'status success';
-        } else {
-          resultDiv.textContent = 'No transaction details found.';
-          resultDiv.className = 'status error';
-        }
-      } catch (error) {
-        resultDiv.textContent = 'Error checking transactions: ' + error.message;
-        resultDiv.className = 'status error';
-      } finally {
-        button.disabled = false;
-        loader.style.display = 'none';
-      }
-    }
-
-    async function checkLifiTransactions() {
-      const txHash = document.getElementById('lifiTxHash').value;
-      const chain = document.getElementById('chainLifi').value;
-
-      const button = document.getElementById('checkLifiTransactionsBtn');
-      const loader = document.getElementById('checkLifiTransactionsLoader');
-      const resultDiv = document.getElementById('lifiTransactionsResult');
-
-      button.disabled = true;
-      loader.style.display = 'inline-block';
-
-      try {
-        const response = await fetch(`/api/lifi?srcTxHash=${txHash}&chain=${chain}`);
-        const result = await response.json();
-
-        // Assuming the response is an array of transactions
-        if (result.length > 0) {
-          if(result.tokenGroups)
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          else
-            displayMultipleTransactionGroups(result, 'transactionGroups')
-
-          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
-          document.getElementById('showTokensBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          });
-
-          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
-          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-          });
-
-          resultDiv.textContent = 'Transaction details fetched successfully.';
-          resultDiv.className = 'status success';
-        } else {
-          resultDiv.textContent = 'No transaction details found.';
-          resultDiv.className = 'status error';
-        }
-      } catch (error) {
-        resultDiv.textContent = 'Error checking transactions: ' + error.message;
-        resultDiv.className = 'status error';
-      } finally {
-        button.disabled = false;
-        loader.style.display = 'none';
-      }
-    }
-    async function checkRangoTransactions() {
-      const txHash = document.getElementById('rangoTxHash').value;
-      const chain = document.getElementById('chainRango').value;
-
-      const button = document.getElementById('checkRangoTransactionsBtn');
-      const loader = document.getElementById('checkRangoTransactionsLoader');
-      const resultDiv = document.getElementById('rangoTransactionsResult');
-
-      button.disabled = true;
-      loader.style.display = 'inline-block';
-
-      try {
-        const response = await fetch(`/api/rango?srcTxHash=${txHash}&chain=${chain}`);
-        const result = await response.json();
-
-        // Assuming the response is an array of transactions
-        if (result.length > 0) {
-          if(result.tokenGroups)
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          else
-            displayMultipleTransactionGroups(result, 'transactionGroups')
-
-          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
-          document.getElementById('showTokensBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-          });
-
-          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
-          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-          });
-
-          resultDiv.textContent = 'Transaction details fetched successfully.';
-          resultDiv.className = 'status success';
-        } else {
-          resultDiv.textContent = 'No transaction details found.';
-          resultDiv.className = 'status error';
-        }
-      } catch (error) {
-        resultDiv.textContent = 'Error checking transactions: ' + error.message;
         resultDiv.className = 'status error';
       } finally {
         button.disabled = false;

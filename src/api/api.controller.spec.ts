@@ -4,7 +4,6 @@ import { ApiController } from './api.controller';
 import * as dotenv from 'dotenv';
 import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
-import { TypeOrmModule } from "@nestjs/typeorm";
 
 describe('ApiController', () => {
   let apiController: ApiController;
@@ -15,16 +14,6 @@ describe('ApiController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [
-        TypeOrmModule.forRoot({
-          type: 'mysql',
-          host: 'localhost',
-          port: 3306,
-          username: 'root',
-          password: 'rootroot',
-          database: 'mint',
-          entities: [],
-          synchronize: true,
-        }),
         ConfigModule.forRoot({
           envFilePath: '.development.env',
         }),
