@@ -1,0 +1,34 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: interchainexplorer
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: interchain-explorer
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+service: interchain-explorer
+
+plugins:
+
+provider:
+  name: aws
+  region: ap-northeast-2
+  runtime: nodejs20.x
+  role: arn:aws:iam::891377242289:role/assumerole-lambda
+
+package:
+  exclude:
+    - node_modules/**
+functions:
+  main:
+    handler: dist/lambda.handler
+    events:
+      - http:
+          method: any
+          path: /{any+}
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent

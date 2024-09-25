@@ -40,7 +40,7 @@ export class ApiService {
   }
 
   async getRecipientActivities(methodName: string, srcTxHash: string, chain: string) {
-    if (methodName === undefined)
+    if (methodName === "Unknown Method")
       return;
     if (methodName === "Drive Bus")
       return this.getRecipientTxListFromDrive(srcTxHash, chain);

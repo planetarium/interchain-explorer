@@ -57,3 +57,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /.development.env
 /.aws/credentials
 /.aws/config
+/.serverless/
