@@ -6,7 +6,7 @@ export class ApiController {
   constructor(private readonly apiService: ApiService) {}
 
   @Get('/list') // LayerZero Protocol (OFTP, ProxyOFT, Pancake, Stargate)
-  async getRecipientActivities(@Query('srcTxHash') srcTxHash: string, @Query('chain') chain: string) {
-    return await this.apiService.selectLogicAndGetRecipientActivities(srcTxHash, chain);
+  async getRecipientActivities(@Query('srcTxHash') srcTxHash: string) {
+    return await this.apiService.selectLogicAndGetRecipientActivities(srcTxHash);
   }
 }

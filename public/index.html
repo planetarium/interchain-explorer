@@ -161,13 +161,6 @@
           <h3>통합 조회</h3>
           <input type="text" id="txHash" placeholder="Enter Source Transaction Hash" />
 
-          <div class="dropdown-container">
-            <select id="chain" class="custom-dropdown">
-              <option value="Mainnet">Mainnet</option>
-              <option value="BNB">BNB</option>
-              <option value="Arbitrum">Arbitrum</option>
-            </select>
-          </div>
           <div>
             <button class = "btn active" id="showTokensBtn">토큰</button>
             <button class = "btn" id="showTransactionsBtn">트랜잭션</button>
@@ -196,7 +189,6 @@
   <script>
     async function getTransactions() {
       const txHash = document.getElementById('txHash').value;
-      const chain = document.getElementById('chain').value;
       const button = document.getElementById('getTransactionsBtn');
       const loader = document.getElementById('getTransactionsLoader');
       const resultDiv = document.getElementById('transactionsResult');
@@ -205,19 +197,18 @@
       loader.style.display = 'inline-block';
 
       try {
-        const response = await fetch(`/api/list?srcTxHash=${txHash}&chain=${chain}`);
+        const response = await fetch(`/api/list?srcTxHash=${txHash}`);
         const result = await response.json();
         // Assuming the response is an array of transactions
         if (result.length > 0) {
           // Loop through each transaction and display the details
           // 기본적으로 tokenGroups를 먼저 표시
           if (result.tokenGroups) {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
+            displayMultipleTransactionGroups(result, 'transactionGroups');
             document.getElementById('showTokensBtn').classList.add('active');
           }
-
           else
-            displayMultipleTransactionGroups(result, 'transactionGroups');
+            displayMultipleTransactionGroups(result, 'tokenGroups');
 
           // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
           document.getElementById('showTokensBtn').addEventListener('click', () => {
@@ -251,7 +242,7 @@
     const explorers = {
       'BNB': 'https://bscscan.com',
       'Arbitrum': 'https://arbiscan.io',
-      'Mainnet': 'https://etherscan.io'
+      'ethereum': 'https://etherscan.io'
       // 필요한 다른 체인과 익스플로러 링크를 여기 추가
     };
     const tokenLogos = {
@@ -296,7 +287,7 @@
           const transactionDiv = document.createElement('div');
           transactionDiv.className = 'transaction';
 
-          const explorerBaseURL = explorers[transaction.chain] || explorers['BNB'];
+          const explorerBaseURL = explorers[transaction.chain];
           // 각 트랜잭션에 대한 제목 추가
           if (index === 0) {
             const bridgeTitle = document.createElement('h3');
