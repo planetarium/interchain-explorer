@@ -574,11 +574,11 @@ export class ApiService {
     switch (chain) {
       case 'bsc':
         url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
-        chainName = 'BNB';
+        chainName = 'bsc';
         break;
       case 'arbitrum':
         url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
-        chainName = 'Arbitrum';
+        chainName = 'arbitrum';
         break;
       case 'ethereum':
         url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("ETHERSCAN_API_KEY")}`;
@@ -622,11 +622,11 @@ export class ApiService {
     switch (chain) {
       case 'bsc':
         url = `https://api.bscscan.com/api?module=account&action=tokentx&address=${address}&page=1&offset=6&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
-        chainName = 'BNB';
+        chainName = 'bsc';
         break;
       case 'arbitrum':
         url = `https://api.arbiscan.io/api?module=account&action=tokentx&address=${address}&page=1&offset=6&sort=desc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
-        chainName = 'Arbitrum';
+        chainName = 'arbitrum';
         break;
       case 'ethereum':
         url = `https://api.etherscan.io/api?module=account&action=tokentx&address=${address}&page=1&offset=6&sort=desc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ETHERSCAN_API_KEY")}`;
