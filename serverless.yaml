@@ -11,7 +11,13 @@ provider:
   name: aws
   region: ap-northeast-2
   runtime: nodejs20.x
-  role: arn:aws:iam::891377242289:role/assumerole-lambda
+  role: arn:aws:iam::211125689225:role/lambda-role-interchain-explorer
+  tags:
+    Name: Interchain Explorer
+    Project: Interchain Explorer
+    Owner: Inseo
+    Team: GameFi
+
 
 package:
   exclude:
