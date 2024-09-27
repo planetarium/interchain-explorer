@@ -113,6 +113,48 @@
           border-collapse: collapse;
       }
 
+      .bridge-info-card {
+          background-color: #f4f4f4;
+          border: 1px solid #ddd;
+          border-radius: 10px;
+          padding: 15px;
+          margin-bottom: 15px;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .bridge-info-card p {
+          margin: 10px 0;
+          font-size: 14px;
+          color: #333;
+      }
+
+      .bridge-info-card strong {
+          font-weight: 600;
+          color: #ff5733; /* Strong text 색상 */
+      }
+
+      .bridge-info-card a {
+          color: #007bff;
+          text-decoration: none;
+      }
+
+      .bridge-info-card a:hover {
+          text-decoration: underline;
+      }
+
+      .bridge-info-card img {
+          vertical-align: middle;
+          margin-right: 8px;
+          width: 24px;
+          height: 24px;
+      }
+
+      .bridge-info-card .value {
+          font-weight: 500;
+          color: #28a745; /* Value에 대한 색상 */
+      }
+
+
       .transaction-table td {
           padding: 8px;
           border-bottom: 1px solid #eee;
@@ -212,7 +254,10 @@
   </div>
 
   <div class="result-section hidden">
-    <button class="btn back-btn" onclick="showInputSection()">Back</button>
+    <button class="btn back-btn" onclick="showInputSection()">뒤로가기</button>
+    <div class="bridge" id="bridgeInfo">
+      <!-- Source and destination info will be dynamically inserted here -->
+    </div>
     <div class="toggle-buttons">
       <button class="btn active" id="showTokensBtn">토큰</button>
       <button class="btn" id="showTransactionsBtn">트랜잭션</button>
@@ -251,6 +296,8 @@
         if (result.length > 0) {
           document.querySelector('.input-section').classList.add('hidden');
           document.querySelector('.result-section').classList.remove('hidden');
+          const {sourceTx, destinationTx} = result[0];
+          displayBridge(sourceTx, destinationTx);
           // 기본적으로 tokenGroups를 먼저 표시
           if (result.tokenGroups) {
             displayMultipleTransactionGroups(result, 'transactionGroups');
@@ -315,11 +362,42 @@
       // 다른 토큰 심볼과 로고를 여기 추가
     };
 
+    function displayBridge(sourceTx, destinationTx) {
+      const container = document.getElementById('bridgeInfo');
+      container.innerHTML = ''; // 기존 내용을 지웁니다.
+      const bridgeDiv = document.getElementById('bridgeInfo');
+
+// Create source and destination info elements
+      const sourceValue = (Number(sourceTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
+      const destinationValue = (Number(destinationTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
+
+      const sourceInfo = document.createElement('div');
+      sourceInfo.className = 'bridge-info-card';
+      sourceInfo.innerHTML = `<p><strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) -
+    <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a>
+    - <span class="value">Value: ${sourceValue}</span>
+  </p>`;
+      sourceInfo.prepend(createTokenImage(sourceTx.id));
+
+      const destinationInfo = document.createElement('div');
+      destinationInfo.className = 'bridge-info-card';
+      destinationInfo.innerHTML = `
+  <p><strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) -
+    <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a>
+    - <span class="value">Value: ${destinationValue}</span>
+  </p>`;
+      destinationInfo.prepend(createTokenImage(destinationTx.id));
+
+// Append the info to the bridge div
+      bridgeDiv.appendChild(sourceInfo);
+      bridgeDiv.appendChild(destinationInfo);
+
+    }
+
     function displayMultipleTransactionGroups(data, type) {
       const container = document.getElementById('transactionDetailsBody');
       container.innerHTML = ''; // 기존 내용을 지웁니다.
 
-      const { sourceTx, destinationTx } = data[0];
       let transactionGroups;
       if(type === 'tokenGroups')
         transactionGroups = data[0].tokenGroups; // 참조 변수 수정
@@ -349,34 +427,6 @@
             transactionDiv.style.padding = '10px';
             transactionDiv.style.borderRadius = '8px';
 
-            const defaultLogoUrl = 'https://arbiscan.io/images/main/empty-token.png';
-
-// 이미지 요소 생성 함수
-            function createTokenImage(tokenId) {
-              const img = document.createElement('img');
-              img.src = tokenLogos[tokenId] || defaultLogoUrl;
-              img.alt = `${tokenId} logo`;
-              img.width = 20;  // 적절한 크기로 조정
-              img.height = 20;
-              img.onerror = function() {
-                this.onerror = null;
-                this.src = defaultLogoUrl;
-              };
-              return img;
-            }
-            const sourceValue = (Number(sourceTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
-            const destinationValue = (Number(destinationTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
-// 소스 정보 생성
-            const sourceInfo = document.createElement('p');
-            sourceInfo.innerHTML = `<strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) - <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a> - Value: ${sourceValue}` ;
-            sourceInfo.prepend(createTokenImage(sourceTx.id));
-            transactionDiv.appendChild(sourceInfo);
-
-// 목적지 정보 생성
-            const destinationInfo = document.createElement('p');
-            destinationInfo.innerHTML = `<strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) - <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a> - Value: ${destinationValue}`;
-            destinationInfo.insertBefore(createTokenImage(destinationTx.id), destinationInfo.firstChild);
-            transactionDiv.appendChild(destinationInfo);
           } else {
             const title = document.createElement('h3');
             title.textContent = `Transaction #${index}`;
@@ -482,7 +532,18 @@
       document.getElementById('transactionDetails').style.display = 'block';
     }
 
-
+    function createTokenImage(tokenId) {
+      const img = document.createElement('img');
+      img.src = tokenLogos[tokenId] || tokenLogos['unknown'];
+      img.alt = `${tokenId} logo`;
+      img.width = 20;  // 적절한 크기로 조정
+      img.height = 20;
+      img.onerror = function() {
+        this.onerror = null;
+        this.src = tokenLogos['unknown'];
+      };
+      return img;
+    }
 
   </script>
 </body>

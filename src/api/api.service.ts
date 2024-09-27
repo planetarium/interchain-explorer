@@ -67,7 +67,7 @@ export class ApiService {
     /** 토큰의 종류를 조회하기 위해 로그에서 전송되는 토큰 정보를 가져옵니다. function name() view returns (string)", "function symbol() view returns (string) **/
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
     let { sourceTokenName, sourceTokenSymbol } = await this.getTokenInfoInTransferLogs(sourceLogs, sourceProvider);
-    if (sourceTokenSymbol === "USDT")
+    if (sourceTokenSymbol === "USDT" || sourceTokenSymbol ===  "USDC")
       inputAmount *= BigInt(1000000000000); //표기 양식이 다름
 
     /** sourceTx 생성!! **/
