@@ -18,7 +18,6 @@ provider:
     Owner: Inseo
     Team: GameFi
 
-
 package:
   exclude:
     - node_modules/**
@@ -26,15 +25,9 @@ functions:
   main:
     handler: dist/lambda.handler
     events:
-      - http:
-          method: any
-          path: /{any+}
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
+      - httpApi:  # HTTP API Gateway 사용
+          method: GET  # 모든 메서드 허용
+          path: /  # 기본 경로
+      - httpApi:
+          method: GET  # GET 메서드
+          path: /api/list  # /api/list 경로
