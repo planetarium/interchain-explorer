@@ -6,6 +6,10 @@ Ethereum, Arbitrum, BNB Smart Chain과 같은 주요 EVM 기반 체인 지원, A
 
 따라서 사용자는 source 트랜잭션 해시값만 입력하면, destination 체인의 트랜잭션/토큰전송 내역 등 어떤 행동들을 했는지 알 수 있습니다.
 
+**https://bridgetracer.planetariumlabs.com**
+
+![image](https://github.com/user-attachments/assets/30416d7e-b5e5-46cc-bb8c-438a5e8423c9)
+
 ## Installation
 
 ```bash
@@ -57,4 +61,5 @@ $ serverless deploy
 - 실제 사용 사례:
   - Planetarium의 WNCG 토큰을 사용하는 유저들의 행동 패턴 분석에 활용 
   - 다른 사람이 과거에 브릿징 한 후 destination chain에서 어떤 행동을 했는지 궁금해하는 사람
-- https://in-seo.tistory.com/5 (실 서비스를 Nestjs + Serverless + Lambda로 배포해보자)
+- https://in-seo.tistory.com/entry/실-서비스를-Nestjs-Serverless-Lambda로-배포해보자
+- https://in-seo.tistory.com/entry/Serverless-배포시에-MFA인증-하기
