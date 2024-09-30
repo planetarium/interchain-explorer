@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InterChain Explorer</title>
+  <style>
+      :root {
+          --primary-color: #4a90e2;
+          --secondary-color: #f5f5f5;
+          --text-color: #333;
+          --border-radius: 16px;
+          --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      * {
+          box-sizing: border-box;
+      }
+
+      body {
+          font-family: 'Arial', sans-serif;
+          line-height: 1.6;
+          color: var(--text-color);
+          background-color: #f0f2f5;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+      }
+
+      .container {
+          width: 90%;
+          max-width: 800px;
+          background-color: #fff;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          padding: 30px;
+          transition: all 0.3s ease;
+          max-height: 80vh;
+          overflow-y: auto;
+      }
+
+      .input-section, .result-section {
+          transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+
+      .input-section.hidden, .result-section.hidden {
+          display: none;
+          opacity: 0;
+          transform: scale(0.95);
+      }
+
+      h1, h2, h3 {
+          color: var(--primary-color);
+      }
+
+      input[type="text"] {
+          width: 100%;
+          padding: 12px;
+          margin-bottom: 15px;
+          border: 1px solid #ddd;
+          border-radius: var(--border-radius);
+          font-size: 16px;
+      }
+
+      .btn {
+          display: inline-block;
+          background-color: var(--primary-color);
+          color: white;
+          padding: 12px 20px;
+          border: none;
+          border-radius: var(--border-radius);
+          cursor: pointer;
+          font-size: 16px;
+          transition: background-color 0.3s, transform 0.1s;
+      }
+
+      .btn:hover {
+          background-color: #3a7bc8;
+          transform: translateY(-2px);
+      }
+
+      .btn:active {
+          transform: translateY(0);
+      }
+
+      .btn.active {
+          background-color: #007bff;
+      }
+
+      .transaction-group {
+          background-color: #fff;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          padding: 20px;
+          margin-bottom: 20px;
+      }
+
+      .transaction {
+          border-bottom: 1px solid #eee;
+          padding-bottom: 15px;
+          margin-bottom: 15px;
+      }
+
+      .transaction:last-child {
+          border-bottom: none;
+      }
+
+      .transaction-table {
+          width: 100%;
+          border-collapse: collapse;
+      }
+
+      .bridge-info-card {
+          background-color: #f4f4f4;
+          border: 1px solid #ddd;
+          border-radius: 10px;
+          padding: 15px;
+          margin-bottom: 15px;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .bridge-info-card p {
+          margin: 10px 0;
+          font-size: 14px;
+          color: #333;
+      }
+
+      .bridge-info-card strong {
+          font-weight: 600;
+          color: #ff5733; /* Strong text 색상 */
+      }
+
+      .bridge-info-card a {
+          color: #007bff;
+          text-decoration: none;
+      }
+
+      .bridge-info-card a:hover {
+          text-decoration: underline;
+      }
+
+      .bridge-info-card img {
+          vertical-align: middle;
+          margin-right: 8px;
+          width: 24px;
+          height: 24px;
+      }
+
+      .bridge-info-card .value {
+          font-weight: 500;
+          color: #28a745; /* Value에 대한 색상 */
+      }
+
+
+      .transaction-table td {
+          padding: 8px;
+          border-bottom: 1px solid #eee;
+          word-break: break-all;
+      }
+
+      .transaction-table tr:last-child td {
+          border-bottom: none;
+      }
+
+      .loader {
+          border: 3px solid #f3f3f3;
+          border-top: 3px solid var(--primary-color);
+          border-radius: 50%;
+          width: 20px;
+          height: 20px;
+          animation: spin 1s linear infinite;
+          display: none;
+          margin-left: 10px;
+          vertical-align: middle;
+      }
+
+      @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+      }
+
+      .status {
+          padding: 10px;
+          border-radius: var(--border-radius);
+          margin-top: 10px;
+      }
+
+      .status.success {
+          background-color: #d4edda;
+          border-color: #c3e6cb;
+          color: #155724;
+      }
+
+      .status.error {
+          background-color: #f8d7da;
+          border-color: #f5c6cb;
+          color: #721c24;
+      }
+
+      .back-btn {
+          margin-bottom: 20px;
+      }
+
+      .toggle-buttons {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 5px;
+      }
+
+      .toggle-buttons .btn {
+          margin: 0 10px;
+      }
+
+      .details-container {
+          max-height: calc(80vh - 200px);
+          overflow-y: auto;
+          padding-right: 10px;
+      }
+
+      .details-container::-webkit-scrollbar {
+          width: 8px;
+      }
+
+      .details-container::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+      }
+
+      .details-container::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 4px;
+      }
+
+      .details-container::-webkit-scrollbar-thumb:hover {
+          background: #555;
+      }
+
+      #getTransactionsBtn {
+          width: 100%;
+      }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="input-section">
+    <h2>인터체인 익스플로러</h2>
+    <input type="text" id="txHash" placeholder="Enter Source Transaction Hash" />
+    <button class="btn" id="getTransactionsBtn" onclick="getTransactions()">검색하기 <span id="getTransactionsLoader" class="loader"></span></button>
+    <div id="transactionsResult" class="status"></div>
+  </div>
+
+  <div class="result-section hidden">
+    <button class="btn back-btn" onclick="showInputSection()">뒤로가기</button>
+    <div class="bridge" id="bridgeInfo">
+      <!-- Source and destination info will be dynamically inserted here -->
+    </div>
+    <div class="toggle-buttons">
+      <button class="btn active" id="showTokensBtn">토큰</button>
+      <button class="btn" id="showTransactionsBtn">트랜잭션</button>
+    </div>
+    <div id="transactionDetails" class="details-container">
+      <div class="details-card">
+        <table>
+          <tbody id="transactionDetailsBody">
+          <!-- Data rows will be inserted here by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <script>
+    function showInputSection() {
+      document.querySelector('.input-section').classList.remove('hidden');
+      document.querySelector('.result-section').classList.add('hidden');
+    }
+
+    async function getTransactions() {
+      const txHash = document.getElementById('txHash').value;
+      const button = document.getElementById('getTransactionsBtn');
+      const loader = document.getElementById('getTransactionsLoader');
+      const resultDiv = document.getElementById('transactionsResult');
+
+      button.disabled = true;
+      loader.style.display = 'inline-block';
+
+      try {
+        const response = await fetch(`/api/list?srcTxHash=${txHash}`);
+        const result = await response.json();
+        // Assuming the response is an array of transactions
+        if (result.length > 0) {
+          document.querySelector('.input-section').classList.add('hidden');
+          document.querySelector('.result-section').classList.remove('hidden');
+          const {sourceTx, destinationTx} = result[0];
+          displayBridge(sourceTx, destinationTx);
+          // 기본적으로 tokenGroups를 먼저 표시
+          if (result.tokenGroups) {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+            document.getElementById('showTokensBtn').classList.add('active');
+          }
+          else
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+
+          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
+          document.getElementById('showTokensBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'tokenGroups');
+            document.getElementById('showTokensBtn').classList.add('active');
+            document.getElementById('showTransactionsBtn').classList.remove('active');
+          });
+
+          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
+          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
+            displayMultipleTransactionGroups(result, 'transactionGroups');
+            document.getElementById('showTransactionsBtn').classList.add('active');
+            document.getElementById('showTokensBtn').classList.remove('active');
+          });
+
+          resultDiv.textContent = 'Transaction details fetched successfully.';
+          resultDiv.className = 'status success';
+        } else {
+          resultDiv.textContent = 'No transaction details found.';
+          resultDiv.className = 'status error';
+        }
+      } catch (error) {
+        resultDiv.textContent = 'Error checking BNB transactions: ' + error.message;
+        resultDiv.className = 'status error';
+      } finally {
+        button.disabled = false;
+        loader.style.display = 'none';
+      }
+    }
+
+    const explorers = {
+      'bsc': 'https://bscscan.com',
+      'arbitrum': 'https://arbiscan.io',
+      'ethereum': 'https://etherscan.io'
+      // 필요한 다른 체인과 익스플로러 링크를 여기 추가
+    };
+    const tokenLogos = {
+      'QORPO': 'https://etherscan.io/token/images/qorpo_32.png',
+      'WETH': 'https://arbiscan.io/token/images/weth_28.png',
+      'WNCG': 'https://etherscan.io/token/images/wrappedncg_32.png?=v37',
+      'WBNB' : 'https://etherscan.io/token/images/binancebnb_32.png',
+      'MGP': 'https://bscscan.com/token/images/magpie_32.png',
+      'BSC-USD': 'https://bscscan.com/token/images/busdt_32.png',
+      'DMT': 'https://etherscan.io/token/images/sankodreammachine_32.png',
+      'GHX': 'https://bscscan.com/token/images/gamercoin_32.png',
+      "USDC": "https://etherscan.io/token/images/centre-usdc_28.png",
+      "USDT" : "https://etherscan.io/token/images/tethernew_32.png",
+      "REEF": "https://etherscan.io/token/images/reeffinance_32.png",
+      'wstETH' : "https://etherscan.io/token/images/wsteth3_32.png",
+      'Cake' : "https://bscscan.com/token/images/pancake_32.png?=v1",
+      "OMNI": "https://arbiscan.io/token/images/omnicat_32.png",
+      'BUSD' : 'https://bscscan.com/token/images/busd_32_2.png',
+      'unknown' : "https://w7.pngwing.com/pngs/373/221/png-transparent-question-mark-question-mark-text-orange-material.png",
+      'ETH' : "https://f1.tokenpost.kr/2018/03/vqx29ypkhm.png"
+      // 다른 토큰 심볼과 로고를 여기 추가
+    };
+
+    function displayBridge(sourceTx, destinationTx) {
+      const container = document.getElementById('bridgeInfo');
+      container.innerHTML = ''; // 기존 내용을 지웁니다.
+      const bridgeDiv = document.getElementById('bridgeInfo');
+
+// Create source and destination info elements
+      const sourceValue = (Number(sourceTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
+      const destinationValue = (Number(destinationTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
+
+      const sourceInfo = document.createElement('div');
+      sourceInfo.className = 'bridge-info-card';
+      sourceInfo.innerHTML = `<p><strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) -
+    <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a>
+    - <span class="value">Value: ${sourceValue}</span>
+  </p>`;
+      sourceInfo.prepend(createTokenImage(sourceTx.id));
+
+      const destinationInfo = document.createElement('div');
+      destinationInfo.className = 'bridge-info-card';
+      destinationInfo.innerHTML = `
+  <p><strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) -
+    <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a>
+    - <span class="value">Value: ${destinationValue}</span>
+  </p>`;
+      destinationInfo.prepend(createTokenImage(destinationTx.id));
+
+// Append the info to the bridge div
+      bridgeDiv.appendChild(sourceInfo);
+      bridgeDiv.appendChild(destinationInfo);
+
+    }
+
+    function displayMultipleTransactionGroups(data, type) {
+      const container = document.getElementById('transactionDetailsBody');
+      container.innerHTML = ''; // 기존 내용을 지웁니다.
+
+      let transactionGroups;
+      if(type === 'tokenGroups')
+        transactionGroups = data[0].tokenGroups; // 참조 변수 수정
+      else
+        transactionGroups = data[0].transactionGroups;
+
+      transactionGroups.forEach((transactions, groupIndex) => {
+        // 트랜잭션 그룹에 대한 wrapper div 생성
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'transaction-group';
+
+        transactions.forEach((transaction, index) => {
+          // 각 트랜잭션에 대한 wrapper div 생성
+          const transactionDiv = document.createElement('div');
+          transactionDiv.className = 'transaction';
+
+          const explorerBaseURL = explorers[transaction.chain];
+          // 각 트랜잭션에 대한 제목 추가
+          if (index === 0) {
+            const bridgeTitle = document.createElement('h3');
+            bridgeTitle.textContent = `브릿징 이후 가장 최신 트랜잭션`;
+            bridgeTitle.style.color = '#ff5733'; // 예를 들어, 색상 변경
+            bridgeTitle.style.borderBottom = '2px solid #ff5733'; // 하단에 구분선 추가
+            transactionDiv.appendChild(bridgeTitle);
+            // 브릿지 트랜잭션에 대한 스타일링
+            transactionDiv.style.backgroundColor = '#f9f9f9';
+            transactionDiv.style.padding = '10px';
+            transactionDiv.style.borderRadius = '8px';
+
+          } else {
+            const title = document.createElement('h3');
+            title.textContent = `Transaction #${index}`;
+            transactionDiv.appendChild(title);
+          }
+
+          // 트랜잭션 세부 정보를 위한 테이블 생성
+          const table = document.createElement('table');
+          table.className = 'transaction-table';
+
+          const tableBody = document.createElement('tbody');
+          table.appendChild(tableBody);
+
+
+          // 필드 및 해당 값을 정의
+          let fields;
+          if (type === 'tokenGroups') {
+            // tokenGroups일 때 기존 필드 구조
+            fields = [
+              {
+                label: 'From',
+                value: `<a href="${explorerBaseURL}/address/${transaction.from}" target="_blank">${transaction.from}</a>`
+              },
+              {
+                label: 'To',
+                value: `<a href="${explorerBaseURL}/address/${transaction.to}" target="_blank">${transaction.to}</a>`
+              },
+              {
+                label: 'Value',
+                value: Number((BigInt(transaction.value) / BigInt(1e18)).toString()).toFixed(5) + ' Token'
+              },
+              {
+                label: 'Timestamp',
+                value: new Date(transaction.timeStamp * 1000).toLocaleString()
+              },
+              {
+                label: 'Transaction Hash',
+                value: `<a href="${explorerBaseURL}/tx/${transaction.hash}" target="_blank">${transaction.hash}</a>`
+              },
+              {
+                label: 'Token',
+                value: `<img src="${tokenLogos[transaction.tokenSymbol]}" alt="${transaction.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${transaction.tokenName} (${transaction.tokenSymbol})`
+              }
+            ];
+          } else {
+            // transactionGroups일 때 필드 구조 변경
+            fields = [
+              {
+                label: 'Function Name',
+                value: `<span style="font-weight: bold; color: #FF5722;">${transaction.functionName || 'Transfer'}</span>`
+              },
+              {
+                label: 'From',
+                value: `<a href="${explorerBaseURL}/address/${transaction.from}" target="_blank">${transaction.from}</a>`
+              },
+              {
+                label: 'To',
+                value: `<a href="${explorerBaseURL}/address/${transaction.to}" target="_blank">${transaction.to}</a>`
+              },
+              {
+                label: 'Value',
+                value: Number((BigInt(transaction.value) / BigInt(1e18)).toString()).toFixed(5) + ' ETH'
+              },
+              {
+                label: 'Timestamp',
+                value: new Date(transaction.timeStamp * 1000).toLocaleString()
+              },
+              {
+                label: 'Transaction Hash',
+                value: `<a href="${explorerBaseURL}/tx/${transaction.hash}" target="_blank">${transaction.hash}</a>`
+              }
+            ];
+          }
+
+          // 테이블에 행 추가
+          fields.forEach(field => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+          <td>${field.label}</td>
+          <td>${field.value}</td>
+        `;
+            tableBody.appendChild(row);
+          });
+
+          // 테이블을 트랜잭션 div에 추가
+          transactionDiv.appendChild(table);
+
+          // 트랜잭션 div를 그룹 div에 추가
+          groupDiv.appendChild(transactionDiv);
+        });
+
+        // 트랜잭션 그룹 간에 구분자 추가
+        if (groupIndex < transactionGroups.length - 1) {
+          const separator = document.createElement('hr');
+          groupDiv.appendChild(separator);
+        }
+
+        // 그룹 div를 컨테이너에 추가
+        container.appendChild(groupDiv);
+      });
+
+      // 트랜잭션 세부 섹션을 표시
+      document.getElementById('transactionDetails').style.display = 'block';
+    }
+
+    function createTokenImage(tokenId) {
+      const img = document.createElement('img');
+      img.src = tokenLogos[tokenId] || tokenLogos['unknown'];
+      img.alt = `${tokenId} logo`;
+      img.width = 20;  // 적절한 크기로 조정
+      img.height = 20;
+      img.onerror = function() {
+        this.onerror = null;
+        this.src = tokenLogos['unknown'];
+      };
+      return img;
+    }
+
+  </script>
+</body>
+</html>

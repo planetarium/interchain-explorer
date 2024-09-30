@@ -1,0 +1,33 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: interchainexplorer
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: interchain-explorer
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+service: interchain-explorer
+
+plugins:
+
+provider:
+  name: aws
+  region: ap-northeast-2
+  runtime: nodejs20.x
+  role: arn:aws:iam::211125689225:role/lambda-role-interchain-explorer
+  tags:
+    Name: Interchain Explorer
+    Project: Interchain Explorer
+    Owner: Inseo
+    Team: GameFi
+
+package:
+  exclude:
+    - node_modules/**
+functions:
+  main:
+    handler: dist/lambda.handler
+    events:
+      - httpApi:  # HTTP API Gateway 사용
+          method: GET  # 모든 메서드 허용
+          path: /  # 기본 경로
+      - httpApi:
+          method: GET  # GET 메서드
+          path: /api/list  # /api/list 경로
