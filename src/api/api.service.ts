@@ -47,7 +47,7 @@ export class ApiService {
       return this.getRecipientTxListFromBridge(srcTxHash);
     else if (methodName === "deposit")
       return this.getRecipientTxListFromAcross(srcTxHash, "arbitrum");
-    else if (methodName === "send" || "sendFrom" || "sendOFT" || "sendOFTV2" || "swapBridgeToV2" || "sendProxyOFTV2")
+    else if (methodName === "send" || "sendFrom" || "sendOFT" || "sendOFTV2" || "swapBridgeToV2" || "sendProxyOFTV2" || "SendProxyOFTFeeV2")
       return this.getRecipientTxListFromOFT(srcTxHash);
     else
       return '';

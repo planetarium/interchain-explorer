@@ -16,6 +16,7 @@ export class MethodMapperService {
     "0x695ef6bf": "sendFrom",
     "0xa8198c00": "sendOFTV2",
     "0x498eff64": "sendOFT",
+    "0x8bcb586c": "SendProxyOFTFeeV2",
     "0xe0db3fcf": "deposit"
   };
 
