@@ -5,6 +5,7 @@ import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, Transact
 import { catchError, firstValueFrom, Observable } from "rxjs";
 import { AxiosError } from "axios";
 import { MethodMapperService } from "../common/method-mapper.service";
+import { EventDictionary } from "../common/event.dictionary";
 
 
 @Injectable()
@@ -77,7 +78,6 @@ export class ApiService {
     /** 수취자의 계좌를 조회합니다. **/
     let recipientAddress = this.getRecipientAddressFromOFT(decodedInputData, inputAmountIdx);
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
-
     /** 수취자의 계좌주소를 통해 Transfer 로그를 찾아냅니다. (토큰 주소도 포함되어 있음)**/
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
 
@@ -221,7 +221,7 @@ export class ApiService {
     const depositorAddress = layerData.source.tx.from;
     const sourceTx = {"address": depositorAddress, "id": "ETH", "name": "ETH", "chain": layerData.pathway.sender.chain, "value": parseInt(srcTx.value.toString(),16).toString()};
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
-
+    console.log(destTx)
     const destinationLogs = await this.getTransferLogsInDestination("", destTx.logs);
     let destinationTx, recipientAddress, outputAmount;
 
@@ -333,7 +333,7 @@ export class ApiService {
     const sourceTx = {"address":depositorAddress, "id": tokenSymbol, "name":tokenName, "chain": "Mainnet", "value": inputAmount.toString()};
     const destinationTx = {"address":recipientAddress, "id": tokenSymbol, "name":tokenName, "chain": chain, "value": outputAmount.toString()};
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(chain, recipientAddress, await this.getBlockNumberByTimeStamp(timeStamp));
-    const response = this.makeResponse("LayerZero", sourceTx, destinationTx, transactionGroups, tokenGroups);
+    const response = this.makeResponse("Across", sourceTx, destinationTx, transactionGroups, tokenGroups);
     console.log(response)
     return response;
   }
@@ -602,7 +602,6 @@ export class ApiService {
     for (const tx of data.result) {
       tx.chain = chainName; // 구분을 위한 체인명 삽입
     }
-
     if (data.message === "OK") {
       return data.result;
     } else {
@@ -658,7 +657,7 @@ export class ApiService {
         return '';
       }
     } catch (e) {
-      console.log('API를 불러오는 데 오류가 생김. Provider API들이 제대로 안불러졌다는 뜻.')
+      console.log('API를 불러오는 데 오류가 생김. Provider API들의 오류.')
     }
 
   }
@@ -690,18 +689,47 @@ export class ApiService {
     return provider;
   }
 
-  async makeResponseGroups(chain: string, recipientAddress, blockNumber: number) {
+  async makeResponseGroups(chain: string, recipientAddress: string, blockNumber: number) {
+    const provider = this.selectProvider(chain);
     const [transactions, tokens] = await Promise.all([
       this.getTxListByAddress(recipientAddress, String(blockNumber), chain),
-      this.getTokenTxByAddress(recipientAddress, String(blockNumber), chain)
+      []
     ]);
+
+    for (const tx of transactions) {
+      let data = await provider.getTransactionReceipt(tx.hash);
+      let isTransferTransaction = false;
+      if(tx.functionName.toLowerCase()=== 'transfer')
+        isTransferTransaction = true;
+
+      tx.methodNames = []; // methodNames 배열 초기화
+
+      for (const log of data.logs) {
+        const methodName = this.getMethodName(log.topics[0]);
+        if(isTransferTransaction) {
+          const { tokenName, tokenSymbol } = await this.getTokenInfo(log.address, provider);
+          tx.methodNames.push({
+            methodName: methodName,
+            address: log.address,
+            tokenName: tokenName,
+            tokenSymbol: tokenSymbol,
+            value: parseInt(log.data, 16)
+          });
+        }
+        else {
+          tx.methodNames.push({
+            methodName: methodName,
+            address: log.address
+          });
+        }
+      }
+    }
 
     const transactionGroups = [];
     const tokenGroups = [];
     if (transactions)
       transactionGroups.push(transactions);
-    if (tokens)
-      tokenGroups.push(tokens);
+
     return { transactionGroups, tokenGroups };
   }
 
@@ -720,5 +748,9 @@ export class ApiService {
   private getMethodId(srcTx) {
     const inputData = srcTx.input; // 트랜잭션의 input data
     return inputData.slice(0, 10); // 첫 10글자를 MethodID로 추출 (0x + 4바이트)
+  }
+
+  private getMethodName(signature: string) {
+    return EventDictionary.getName(signature);
   }
 }

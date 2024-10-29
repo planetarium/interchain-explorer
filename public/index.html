@@ -31,8 +31,8 @@
       }
 
       .container {
-          width: 90%;
-          max-width: 800px;
+          width: 900%;
+          max-width: 1000px;
           background-color: #fff;
           border-radius: var(--border-radius);
           box-shadow: var(--box-shadow);
@@ -218,6 +218,9 @@
           max-height: calc(80vh - 200px);
           overflow-y: auto;
           padding-right: 10px;
+          display: flex;
+          align-items: center; /* 수직 중앙 정렬 */
+          justify-content: center; /* 수평 중앙 정렬 */
       }
 
       .details-container::-webkit-scrollbar {
@@ -258,10 +261,6 @@
     <div class="bridge" id="bridgeInfo">
       <!-- Source and destination info will be dynamically inserted here -->
     </div>
-    <div class="toggle-buttons">
-      <button class="btn active" id="showTokensBtn">토큰</button>
-      <button class="btn" id="showTransactionsBtn">트랜잭션</button>
-    </div>
     <div id="transactionDetails" class="details-container">
       <div class="details-card">
         <table>
@@ -298,27 +297,9 @@
           document.querySelector('.result-section').classList.remove('hidden');
           const {protocol, sourceTx, destinationTx} = result[0];
           displayBridge(protocol, sourceTx, destinationTx);
-          // 기본적으로 tokenGroups를 먼저 표시
-          if (result.tokenGroups) {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-            document.getElementById('showTokensBtn').classList.add('active');
-          }
-          else
-            displayMultipleTransactionGroups(result, 'tokenGroups');
 
-          // 토큰과 트랜잭션을 출력할 수 있는 버튼 설정
-          document.getElementById('showTokensBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'tokenGroups');
-            document.getElementById('showTokensBtn').classList.add('active');
-            document.getElementById('showTransactionsBtn').classList.remove('active');
-          });
+          displayMultipleTransactionGroups(result, 'transactionGroups');
 
-          // 트랜잭션 버튼 클릭 시 transactionGroups 표시
-          document.getElementById('showTransactionsBtn').addEventListener('click', () => {
-            displayMultipleTransactionGroups(result, 'transactionGroups');
-            document.getElementById('showTransactionsBtn').classList.add('active');
-            document.getElementById('showTokensBtn').classList.remove('active');
-          });
 
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
@@ -408,15 +389,11 @@
     }
 
 
-    function displayMultipleTransactionGroups(data, type) {
+    function displayMultipleTransactionGroups(data) {
       const container = document.getElementById('transactionDetailsBody');
       container.innerHTML = ''; // 기존 내용을 지웁니다.
 
-      let transactionGroups;
-      if(type === 'tokenGroups')
-        transactionGroups = data[0].tokenGroups; // 참조 변수 수정
-      else
-        transactionGroups = data[0].transactionGroups;
+      const transactionGroups = data[0].transactionGroups;
 
       transactionGroups.forEach((transactions, groupIndex) => {
         // 트랜잭션 그룹에 대한 wrapper div 생성
@@ -458,64 +435,34 @@
 
 
           // 필드 및 해당 값을 정의
-          let fields;
-          if (type === 'tokenGroups') {
-            // tokenGroups일 때 기존 필드 구조
-            fields = [
+          const fields = [
               {
-                label: 'From',
-                value: `<a href="${explorerBaseURL}/address/${transaction.from}" target="_blank">${transaction.from}</a>`
+                label: 'Timestamp',
+                value: new Date(transaction.timeStamp * 1000).toLocaleString()
               },
               {
                 label: 'To',
                 value: `<a href="${explorerBaseURL}/address/${transaction.to}" target="_blank">${transaction.to}</a>`
               },
               {
-                label: 'Value',
-                value: Number((BigInt(transaction.value) / BigInt(1e18)).toString()).toFixed(5) + ' Token'
-              },
-              {
-                label: 'Timestamp',
-                value: new Date(transaction.timeStamp * 1000).toLocaleString()
-              },
-              {
                 label: 'Transaction Hash',
                 value: `<a href="${explorerBaseURL}/tx/${transaction.hash}" target="_blank">${transaction.hash}</a>`
               },
               {
-                label: 'Token',
-                value: `<img src="${tokenLogos[transaction.tokenSymbol]}" alt="${transaction.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${transaction.tokenName} (${transaction.tokenSymbol})`
+                label: 'Called Method',
+                value: `<span style="font-weight: bold; color: #FF5722;">${transaction.functionName}</span>`
+              },
+              {
+                label: 'Event Logs',
+                value: transaction.methodNames
+                  .map(method =>
+                    transaction.functionName.toLowerCase().includes('transfer')
+                      ? `<div><strong>${method.methodName}</strong> Address: ${method.address}<br><img src="${tokenLogos[method.tokenSymbol]}" alt="${method.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${method.tokenName} (${method.tokenSymbol}) ${(Number(method.value) / 10**18).toFixed(4)}`
+                      : `<div><strong>${method.methodName}</strong></div>`
+                  ).join('')
               }
             ];
-          } else {
-            // transactionGroups일 때 필드 구조 변경
-            fields = [
-              {
-                label: 'Function Name',
-                value: `<span style="font-weight: bold; color: #FF5722;">${transaction.functionName || 'Transfer'}</span>`
-              },
-              {
-                label: 'From',
-                value: `<a href="${explorerBaseURL}/address/${transaction.from}" target="_blank">${transaction.from}</a>`
-              },
-              {
-                label: 'To',
-                value: `<a href="${explorerBaseURL}/address/${transaction.to}" target="_blank">${transaction.to}</a>`
-              },
-              {
-                label: 'Value',
-                value: Number((BigInt(transaction.value) / BigInt(1e18)).toString()).toFixed(5) + ' ETH'
-              },
-              {
-                label: 'Timestamp',
-                value: new Date(transaction.timeStamp * 1000).toLocaleString()
-              },
-              {
-                label: 'Transaction Hash',
-                value: `<a href="${explorerBaseURL}/tx/${transaction.hash}" target="_blank">${transaction.hash}</a>`
-              }
-            ];
-          }
+
 
           // 테이블에 행 추가
           fields.forEach(field => {
