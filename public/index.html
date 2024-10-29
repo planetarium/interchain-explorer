@@ -296,8 +296,8 @@
         if (result.length > 0) {
           document.querySelector('.input-section').classList.add('hidden');
           document.querySelector('.result-section').classList.remove('hidden');
-          const {sourceTx, destinationTx} = result[0];
-          displayBridge(sourceTx, destinationTx);
+          const {protocol, sourceTx, destinationTx} = result[0];
+          displayBridge(protocol, sourceTx, destinationTx);
           // 기본적으로 tokenGroups를 먼저 표시
           if (result.tokenGroups) {
             displayMultipleTransactionGroups(result, 'transactionGroups');
@@ -358,41 +358,55 @@
       "OMNI": "https://arbiscan.io/token/images/omnicat_32.png",
       'BUSD' : 'https://bscscan.com/token/images/busd_32_2.png',
       'unknown' : "https://w7.pngwing.com/pngs/373/221/png-transparent-question-mark-question-mark-text-orange-material.png",
-      'ETH' : "https://f1.tokenpost.kr/2018/03/vqx29ypkhm.png"
+      'ETH' : "https://f1.tokenpost.kr/2018/03/vqx29ypkhm.png",
+      "PEPE": "https://etherscan.io/token/images/pepe_32.png?=v1",
+      'AI': "https://bscscan.com/token/images/anyinu_32.png"
       // 다른 토큰 심볼과 로고를 여기 추가
     };
 
-    function displayBridge(sourceTx, destinationTx) {
+    function displayBridge(protocol, sourceTx, destinationTx) {
       const container = document.getElementById('bridgeInfo');
-      container.innerHTML = ''; // 기존 내용을 지웁니다.
-      const bridgeDiv = document.getElementById('bridgeInfo');
+      container.innerHTML = ''; // Clear existing content
 
-// Create source and destination info elements
-      const sourceValue = (Number(sourceTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
-      const destinationValue = (Number(destinationTx.value) / 10**18).toFixed(4); // value를 ETH 단위로 변환
+      const commonInfo = document.createElement('div');
+      commonInfo.className = 'bridge-info-card';
+      commonInfo.innerHTML = `
+    <p><strong>Entered tx:</strong> ${sourceTx.hash}</p>
+    <p><strong>Bridge:</strong> ${protocol},${sourceTx.chain} -> ${destinationTx.chain}</p>
+  `;
 
+      // Create source transaction details
+      const sourceValue = (Number(sourceTx.value) / 10**18).toFixed(4); // Convert value to ETH
       const sourceInfo = document.createElement('div');
       sourceInfo.className = 'bridge-info-card';
-      sourceInfo.innerHTML = `<p><strong>Source:</strong> ${sourceTx.name} (${sourceTx.chain}) -
-    <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a>
-    - <span class="value">Value: ${sourceValue}</span>
-  </p>`;
-      sourceInfo.prepend(createTokenImage(sourceTx.id));
+      sourceInfo.innerHTML = `
+    <h3>Source tx</h3>
+    <p><strong>Date:</strong> ${sourceTx.timestamp} UTC</p>
+    <p><strong>Sender:</strong> <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a></p>
+    <p><strong>Tx hash:</strong> <a href="${explorers[sourceTx.chain]}/tx/${sourceTx.hash}" target="_blank">${sourceTx.hash}</a></p>
+    <p><strong>Value:</strong> ${sourceValue} ${sourceTx.id} Sent to ${protocol}</p>
+  `;
+      sourceInfo.prepend(createTokenImage(sourceTx.id)); // Add token image
 
+      // Create destination transaction details
+      const destinationValue = (Number(destinationTx.value) / 10**18).toFixed(4); // Convert value to ETH
       const destinationInfo = document.createElement('div');
       destinationInfo.className = 'bridge-info-card';
       destinationInfo.innerHTML = `
-  <p><strong>Destination:</strong> ${destinationTx.name} (${destinationTx.chain}) -
-    <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a>
-    - <span class="value">Value: ${destinationValue}</span>
-  </p>`;
-      destinationInfo.prepend(createTokenImage(destinationTx.id));
+    <h3>Destination tx</h3>
+    <p><strong>Date:</strong> ${destinationTx.timestamp} UTC</p>
+    <p><strong>Receiver:</strong> <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a></p>
+    <p><strong>Tx hash:</strong> <a href="${explorers[destinationTx.chain]}/tx/${destinationTx.hash}" target="_blank">${destinationTx.hash}</a></p>
+    <p><strong>Value:</strong> ${destinationValue} ${destinationTx.id} Sent to receiver</p>
+  `;
+      destinationInfo.prepend(createTokenImage(destinationTx.id)); // Add token image
 
-// Append the info to the bridge div
-      bridgeDiv.appendChild(sourceInfo);
-      bridgeDiv.appendChild(destinationInfo);
-
+      // Append the info to the bridge container
+      container.appendChild(commonInfo);
+      container.appendChild(sourceInfo);
+      container.appendChild(destinationInfo);
     }
+
 
     function displayMultipleTransactionGroups(data, type) {
       const container = document.getElementById('transactionDetailsBody');
@@ -410,13 +424,15 @@
         groupDiv.className = 'transaction-group';
 
         transactions.forEach((transaction, index) => {
+          if(index === 0) //제일 최근껀 어차피 브릿지 트랜잭션이니까.
+            return;
           // 각 트랜잭션에 대한 wrapper div 생성
           const transactionDiv = document.createElement('div');
           transactionDiv.className = 'transaction';
 
           const explorerBaseURL = explorers[transaction.chain];
           // 각 트랜잭션에 대한 제목 추가
-          if (index === 0) {
+          if (index === 1) {
             const bridgeTitle = document.createElement('h3');
             bridgeTitle.textContent = `브릿징 이후 가장 최신 트랜잭션`;
             bridgeTitle.style.color = '#ff5733'; // 예를 들어, 색상 변경
@@ -429,7 +445,7 @@
 
           } else {
             const title = document.createElement('h3');
-            title.textContent = `Transaction #${index}`;
+            title.textContent = `Transaction #${index - 1}`; // 인덱스 1은 강조하기때문에 2부터시작하니 -1을 해줘야 함.
             transactionDiv.appendChild(title);
           }
 
