@@ -32,7 +32,7 @@
 
       .container {
           width: 900%;
-          max-width: 1000px;
+          max-width: 1400px;
           background-color: #fff;
           border-radius: var(--border-radius);
           box-shadow: var(--box-shadow);
@@ -44,6 +44,41 @@
 
       .input-section, .result-section {
           transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+      .result-section {
+          height: 100%; /* 또는 필요한 특정 높이값 */
+          display: flex;
+          flex-direction: column;
+      }
+
+      .scrollable-container {
+          flex: 1;
+          overflow-y: auto;
+          padding-right: 10px;
+          max-height: calc(80vh - 60px); /* 뒤로가기 버튼 높이를 고려한 값 */
+      }
+
+      .scrollable-container::-webkit-scrollbar {
+          width: 8px;
+      }
+
+      .scrollable-container::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+      }
+
+      .scrollable-container::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 4px;
+      }
+
+      .scrollable-container::-webkit-scrollbar-thumb:hover {
+          background: #555;
+      }
+
+      /* 기존 details-container 스타일 제거 또는 수정 */
+      #transactionDetails {
+          margin-top: 20px; /* bridge와의 간격 */
       }
 
       .input-section.hidden, .result-section.hidden {
@@ -204,42 +239,10 @@
           margin-bottom: 20px;
       }
 
-      .toggle-buttons {
-          display: flex;
-          justify-content: center;
-          margin-bottom: 5px;
-      }
-
       .toggle-buttons .btn {
           margin: 0 10px;
       }
 
-      .details-container {
-          max-height: calc(80vh - 200px);
-          overflow-y: auto;
-          padding-right: 10px;
-          display: flex;
-          align-items: center; /* 수직 중앙 정렬 */
-          justify-content: center; /* 수평 중앙 정렬 */
-      }
-
-      .details-container::-webkit-scrollbar {
-          width: 8px;
-      }
-
-      .details-container::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 4px;
-      }
-
-      .details-container::-webkit-scrollbar-thumb {
-          background: #888;
-          border-radius: 4px;
-      }
-
-      .details-container::-webkit-scrollbar-thumb:hover {
-          background: #555;
-      }
 
       #getTransactionsBtn {
           width: 100%;
@@ -257,17 +260,22 @@
   </div>
 
   <div class="result-section hidden">
-    <button class="btn back-btn" onclick="showInputSection()">뒤로가기</button>
-    <div class="bridge" id="bridgeInfo">
-      <!-- Source and destination info will be dynamically inserted here -->
-    </div>
-    <div id="transactionDetails" class="details-container">
-      <div class="details-card">
-        <table>
-          <tbody id="transactionDetailsBody">
-          <!-- Data rows will be inserted here by JavaScript -->
-          </tbody>
-        </table>
+    <div class="scrollable-container">
+      <button class="btn back-btn" onclick="showInputSection()">뒤로가기</button>
+      <div class="bridge" id="bridgeInfo">
+        <!-- Source and destination info will be dynamically inserted here -->
+      </div>
+      <br>
+      <h2 align="center">브릿지 이후의 Tx들</h2>
+      <div id="transactionDetails">
+        <hr>
+        <div class="details-card">
+          <table>
+            <tbody id="transactionDetailsBody">
+            <!-- Data rows will be inserted here by JavaScript -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -319,7 +327,9 @@
     const explorers = {
       'bsc': 'https://bscscan.com',
       'arbitrum': 'https://arbiscan.io',
-      'ethereum': 'https://etherscan.io'
+      'Arbitrum': 'https://arbiscan.io',
+      'ethereum': 'https://etherscan.io',
+      'Mainnet': 'https://etherscan.io',
       // 필요한 다른 체인과 익스플로러 링크를 여기 추가
     };
     const tokenLogos = {
@@ -341,19 +351,23 @@
       'unknown' : "https://w7.pngwing.com/pngs/373/221/png-transparent-question-mark-question-mark-text-orange-material.png",
       'ETH' : "https://f1.tokenpost.kr/2018/03/vqx29ypkhm.png",
       "PEPE": "https://etherscan.io/token/images/pepe_32.png?=v1",
-      'AI': "https://bscscan.com/token/images/anyinu_32.png"
+      'AI': "https://bscscan.com/token/images/anyinu_32.png",
+      'HODL': "https://bscscan.com/token/images/hodlmeme_32.png"
       // 다른 토큰 심볼과 로고를 여기 추가
     };
 
     function displayBridge(protocol, sourceTx, destinationTx) {
       const container = document.getElementById('bridgeInfo');
       container.innerHTML = ''; // Clear existing content
-
+      const srcTimeStamp = new Date(sourceTx.timestamp);
+      const destTimeStamp = new Date(destinationTx.timestamp);
+      srcTimeStamp.setHours(srcTimeStamp.getHours() - 9)
+      destTimeStamp.setHours(destTimeStamp.getHours() - 9)
       const commonInfo = document.createElement('div');
       commonInfo.className = 'bridge-info-card';
       commonInfo.innerHTML = `
     <p><strong>Entered tx:</strong> ${sourceTx.hash}</p>
-    <p><strong>Bridge:</strong> ${protocol},${sourceTx.chain} -> ${destinationTx.chain}</p>
+    <p><strong>Bridge:</strong> ${protocol}, ${sourceTx.chain} -> ${destinationTx.chain}</p>
   `;
 
       // Create source transaction details
@@ -362,12 +376,11 @@
       sourceInfo.className = 'bridge-info-card';
       sourceInfo.innerHTML = `
     <h3>Source tx</h3>
-    <p><strong>Date:</strong> ${sourceTx.timestamp} UTC</p>
-    <p><strong>Sender:</strong> <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a></p>
-    <p><strong>Tx hash:</strong> <a href="${explorers[sourceTx.chain]}/tx/${sourceTx.hash}" target="_blank">${sourceTx.hash}</a></p>
-    <p><strong>Value:</strong> ${sourceValue} ${sourceTx.id} Sent to ${protocol}</p>
+    <p><strong>Date:</strong> ${srcTimeStamp.toLocaleString()} UTC</p>
+    <p><strong>Sender:</strong> (${sourceTx.chain}) <a href="${explorers[sourceTx.chain]}/address/${sourceTx.address}" target="_blank">${sourceTx.address}</a></p>
+    <p><strong>Tx hash:</strong> (${sourceTx.chain}) <a href="${explorers[sourceTx.chain]}/tx/${sourceTx.hash}" target="_blank">${sourceTx.hash}</a></p>
+    <p><strong>Value:</strong> ${sourceValue}  <img src="${tokenLogos[sourceTx.id] || tokenLogos['unknown']}" alt="${sourceTx.id} logo" onerror="this.onerror=null; this.src='${tokenLogos['unknown']}';">${sourceTx.id} Sent to ${protocol}</p>
   `;
-      sourceInfo.prepend(createTokenImage(sourceTx.id)); // Add token image
 
       // Create destination transaction details
       const destinationValue = (Number(destinationTx.value) / 10**18).toFixed(4); // Convert value to ETH
@@ -375,12 +388,11 @@
       destinationInfo.className = 'bridge-info-card';
       destinationInfo.innerHTML = `
     <h3>Destination tx</h3>
-    <p><strong>Date:</strong> ${destinationTx.timestamp} UTC</p>
-    <p><strong>Receiver:</strong> <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a></p>
-    <p><strong>Tx hash:</strong> <a href="${explorers[destinationTx.chain]}/tx/${destinationTx.hash}" target="_blank">${destinationTx.hash}</a></p>
-    <p><strong>Value:</strong> ${destinationValue} ${destinationTx.id} Sent to receiver</p>
+    <p><strong>Date:</strong> ${destTimeStamp.toLocaleString()} UTC</p>
+    <p><strong>Receiver:</strong> (${destinationTx.chain}) <a href="${explorers[destinationTx.chain]}/address/${destinationTx.address}" target="_blank">${destinationTx.address}</a></p>
+    <p><strong>Tx hash:</strong> (${destinationTx.chain}) <a href="${explorers[destinationTx.chain]}/tx/${destinationTx.hash}" target="_blank">${destinationTx.hash}</a></p>
+    <p><strong>Value:</strong> ${destinationValue} <img src="${tokenLogos[destinationTx.id] || tokenLogos['unknown']}" alt="${destinationTx.id} logo" onerror="this.onerror=null; this.src='${tokenLogos['unknown']}';"> ${destinationTx.id} Sent to receiver</p>
   `;
-      destinationInfo.prepend(createTokenImage(destinationTx.id)); // Add token image
 
       // Append the info to the bridge container
       container.appendChild(commonInfo);
@@ -401,30 +413,15 @@
         groupDiv.className = 'transaction-group';
 
         transactions.forEach((transaction, index) => {
-          if(index === 0) //제일 최근껀 어차피 브릿지 트랜잭션이니까.
-            return;
           // 각 트랜잭션에 대한 wrapper div 생성
           const transactionDiv = document.createElement('div');
           transactionDiv.className = 'transaction';
 
           const explorerBaseURL = explorers[transaction.chain];
-          // 각 트랜잭션에 대한 제목 추가
-          if (index === 1) {
-            const bridgeTitle = document.createElement('h3');
-            bridgeTitle.textContent = `브릿징 이후 가장 최신 트랜잭션`;
-            bridgeTitle.style.color = '#ff5733'; // 예를 들어, 색상 변경
-            bridgeTitle.style.borderBottom = '2px solid #ff5733'; // 하단에 구분선 추가
-            transactionDiv.appendChild(bridgeTitle);
-            // 브릿지 트랜잭션에 대한 스타일링
-            transactionDiv.style.backgroundColor = '#f9f9f9';
-            transactionDiv.style.padding = '10px';
-            transactionDiv.style.borderRadius = '8px';
+          const title = document.createElement('h3');
+          title.textContent = `Transaction #${index + 1}`;
+          transactionDiv.appendChild(title);
 
-          } else {
-            const title = document.createElement('h3');
-            title.textContent = `Transaction #${index - 1}`; // 인덱스 1은 강조하기때문에 2부터시작하니 -1을 해줘야 함.
-            transactionDiv.appendChild(title);
-          }
 
           // 트랜잭션 세부 정보를 위한 테이블 생성
           const table = document.createElement('table');
@@ -433,12 +430,13 @@
           const tableBody = document.createElement('tbody');
           table.appendChild(tableBody);
 
-
+          const formattedTimeStamp = new Date(transaction.timeStamp * 1000);
+          formattedTimeStamp.setHours(formattedTimeStamp.getHours() - 9);
           // 필드 및 해당 값을 정의
           const fields = [
               {
                 label: 'Timestamp',
-                value: new Date(transaction.timeStamp * 1000).toLocaleString()
+                value: formattedTimeStamp.toLocaleString() + 'UTC'
               },
               {
                 label: 'To',
@@ -450,14 +448,14 @@
               },
               {
                 label: 'Called Method',
-                value: `<span style="font-weight: bold; color: #FF5722;">${transaction.functionName}</span>`
+                value: `<span style="font-weight: bold; color: #FF5722;">${transaction.functionName || transaction.methodId}</span>`
               },
               {
                 label: 'Event Logs',
                 value: transaction.methodNames
                   .map(method =>
-                    transaction.functionName.toLowerCase().includes('transfer')
-                      ? `<div><strong>${method.methodName}</strong> Address: ${method.address}<br><img src="${tokenLogos[method.tokenSymbol]}" alt="${method.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${method.tokenName} (${method.tokenSymbol}) ${(Number(method.value) / 10**18).toFixed(4)}`
+                    method.methodName.toLowerCase().includes('transfer')
+                      ? `<div><strong>${method.methodName}</strong> (Address: <a href="${explorerBaseURL}/token/${method.address}" target="_blank">${method.address}</a>) <img src="${tokenLogos[method.tokenSymbol]}" alt="${method.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${method.tokenName} (${method.tokenSymbol}) ${(Number(method.value) / 10**18).toFixed(4)}`
                       : `<div><strong>${method.methodName}</strong></div>`
                   ).join('')
               }

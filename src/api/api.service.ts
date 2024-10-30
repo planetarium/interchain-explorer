@@ -14,6 +14,8 @@ export class ApiService {
   private bnbProvider = new EtherscanProvider('bnb', this.configService.get('BNBSCAN_API_KEY'));
   private arbitrumProvider = new InfuraProvider('arbitrum', this.configService.get('INFURA_API_KEY'));
   private mainnetUrl = `https://mainnet.infura.io/v3/${this.configService.get('INFURA_API_KEY')}`;
+  private bnbUrl = `https://bsc-mainnet.infura.io/v3/${this.configService.get('INFURA_API_KEY')}`;
+  private arbiUrl = `https://arbitrum-mainnet.infura.io/v3/${this.configService.get('INFURA_API_KEY')}`;
 
   constructor(
     private readonly httpService: HttpService,
@@ -62,7 +64,7 @@ export class ApiService {
     const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
     const depositorAddress = layerData.source.tx.from;
     const abi = await this.getTxABIInMainnet(srcTx);
-
+    const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
     let { decodedInputData, inputAmountIdx, inputAmount } = await this.parseInputData(abi, srcTxHash, sourceProvider);
 
     /** 토큰의 종류를 조회하기 위해 로그에서 전송되는 토큰 정보를 가져옵니다. function name() view returns (string)", "function symbol() view returns (string) **/
@@ -73,11 +75,12 @@ export class ApiService {
 
     /** sourceTx 생성!! **/
     const sourceTx = { "address": depositorAddress, "id": sourceTokenSymbol, "name": sourceTokenName, "chain": layerData.pathway.sender.chain, "value": inputAmount.toString(),
-      "timestamp": layerData.created.substring(0, layerData.created.length - 5), "hash": layerData.source.tx.txHash};
+      "timestamp": srcTimeStamp, "hash": layerData.source.tx.txHash};
 
     /** 수취자의 계좌를 조회합니다. **/
     let recipientAddress = this.getRecipientAddressFromOFT(decodedInputData, inputAmountIdx);
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destTimeStamp = await this.getTimeStamp('0x'+destTx.blockNumber.toString(16), layerData.pathway.receiver.chain);
     /** 수취자의 계좌주소를 통해 Transfer 로그를 찾아냅니다. (토큰 주소도 포함되어 있음)**/
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
 
@@ -98,8 +101,7 @@ export class ApiService {
     }
     /** destinationTx 생성!! **/
     destinationTx = { "address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString(),
-      "timestamp": layerData.updated.substring(0, layerData.updated.length - 5), "hash": layerData.destination.tx.txHash};
-
+      "timestamp": destTimeStamp, "hash": layerData.destination.tx.txHash};
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(layerData.pathway.receiver.chain, recipientAddress, destTx.blockNumber);
     const response = this.makeResponse("LayerZero", sourceTx, destinationTx, transactionGroups, tokenGroups);
     console.log(response);
@@ -111,6 +113,8 @@ export class ApiService {
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
     const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
+
     const depositorAddress = layerData.source.tx.from;
     const abi = await this.getTxABIInMainnet(srcTx);
 
@@ -134,9 +138,11 @@ export class ApiService {
       sourceTokenName = tokenName;
       sourceTokenSymbol = tokenSymbol;
     }
-    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name":sourceTokenName, "chain": layerData.pathway.sender.chain, "value": inputAmount.toString()};
+    const sourceTx = { "address": depositorAddress, "id": sourceTokenSymbol, "name": sourceTokenName, "chain": layerData.pathway.sender.chain, "value": inputAmount.toString(),
+      "timestamp": srcTimeStamp, "hash": layerData.source.tx.txHash};
 
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destTimeStamp = await this.getTimeStamp('0x'+destTx.blockNumber.toString(16), layerData.pathway.receiver.chain);
     const destinationLogs = await this.getBridgeLogsInDestination(destTx.logs);
     let destinationTokenName = 'ETH', destinationTokenSymbol = 'ETH';
     let outputAmount, destinationTx;
@@ -149,7 +155,8 @@ export class ApiService {
       outputAmount = BigInt(parseInt(amountOutHex, 16));
     }
 
-    destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString()};
+    destinationTx = { "address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString(),
+      "timestamp": destTimeStamp, "hash": layerData.destination.tx.txHash};
 
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(layerData.pathway.receiver.chain, recipientAddress, destTx.blockNumber);
     const response = this.makeResponse("LayerZero", sourceTx, destinationTx, transactionGroups, tokenGroups);
@@ -166,16 +173,19 @@ export class ApiService {
     const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
     const claimLogs = await this.getClaimLogsInSource(srcTx.logs);
     const recipientAddress = '0x' + claimLogs.data.slice(0, 66).slice(-40);  // First 32 bytes
-    // const inputAmountHex = '0x' + claimLogs.data.slice(66);  // Second 32 bytes
-    // const inputAmount = BigInt(parseInt(inputAmountHex,16));  // Convert to string for large numbers
+    const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
-    const sourceTx = {"address": depositorAddress, "id": "X", "name": "X", "chain": layerData.pathway.sender.chain, "value": "0"};
+    const sourceTx = { "address": depositorAddress, "id": 'X', "name": 'X', "chain": layerData.pathway.sender.chain, "value": '0',
+      "timestamp": srcTimeStamp, "hash": layerData.source.tx.txHash};
+
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destTimeStamp = await this.getTimeStamp('0x'+destTx.blockNumber.toString(16), layerData.pathway.receiver.chain);
 
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
     const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
     const outputAmount = BigInt(parseInt(destinationLogs.data,16));
-    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString()};
+    const destinationTx = { "address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString(),
+      "timestamp": destTimeStamp, "hash": layerData.destination.tx.txHash};
 
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(layerData.pathway.receiver.chain, recipientAddress, destTx.blockNumber);
     const response = this.makeResponse("LayerZero", sourceTx, destinationTx, transactionGroups, tokenGroups);
@@ -191,20 +201,23 @@ export class ApiService {
 
     const depositorAddress = layerData.source.tx.from;
     const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
+
     const LayerZeroLogs = await this.getLayerZeroLogsInSource(srcTx.logs);
     const recipientAddress = '0x' + LayerZeroLogs.data.slice(26, 66);  // Extract the second 32 bytes (to address)
     const zroAmountHex = '0x' + LayerZeroLogs.data.slice(66, 130);  // Extract the third 32 bytes (zroAmount)
     const inputAmount = BigInt(zroAmountHex);  // Convert zroAmount to BigInt
 
-    const sourceTx = {"address": depositorAddress, "id": 'ZRO', "name": 'LayerZero', "chain": layerData.pathway.sender.chain, "value": inputAmount.toString()};
+    const sourceTx = {"address": depositorAddress, "id": 'ZRO', "name": 'LayerZero', "chain": layerData.pathway.sender.chain, "value": inputAmount.toString(),
+      "timestamp": srcTimeStamp, "hash": layerData.source.tx.txHash};
 
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
-
+    const destTimeStamp = await this.getTimeStamp('0x'+destTx.blockNumber.toString(16), layerData.pathway.receiver.chain);
     const destinationLogs = await this.getLayerZeroLogsInDestination(destTx.logs);
     const actualAmountHex = '0x' + destinationLogs.data.slice(130, 194);
     const outputAmount = BigInt(parseInt(actualAmountHex, 16));
-    const destinationTx = {"address": recipientAddress, "id": 'ZRO', "name": 'LayerZero', "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString()};
-
+    const destinationTx = {"address": recipientAddress, "id": 'ZRO', "name": 'LayerZero', "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString(),
+      "timestamp": destTimeStamp, "hash": layerData.destination.tx.txHash};
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(layerData.pathway.receiver.chain, recipientAddress, destTx.blockNumber);
     const response = this.makeResponse("LayerZero", sourceTx, destinationTx, transactionGroups, tokenGroups);
 
@@ -218,10 +231,14 @@ export class ApiService {
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
     const depositorAddress = layerData.source.tx.from;
-    const sourceTx = {"address": depositorAddress, "id": "ETH", "name": "ETH", "chain": layerData.pathway.sender.chain, "value": parseInt(srcTx.value.toString(),16).toString()};
+    const sourceTx = { "address": depositorAddress, "id": 'ETH', "name": 'ETH', "chain": layerData.pathway.sender.chain, "value": parseInt(srcTx.value.toString(),16).toString(),
+      "timestamp": srcTimeStamp, "hash": layerData.source.tx.txHash};
+
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
-    console.log(destTx)
+    const destTimeStamp = await this.getTimeStamp('0x'+destTx.blockNumber.toString(16), layerData.pathway.receiver.chain);
+
     const destinationLogs = await this.getTransferLogsInDestination("", destTx.logs);
     let destinationTx, recipientAddress, outputAmount;
 
@@ -239,7 +256,9 @@ export class ApiService {
       const outputAmountHex = '0x' + oftLogs.data.slice(66);  // Second 32 bytes
       outputAmount = BigInt(parseInt(outputAmountHex,16));  // Convert to string for large numbers
     }
-    destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString()};
+
+    destinationTx = { "address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString(),
+      "timestamp": destTimeStamp, "hash": layerData.destination.tx.txHash};
 
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(layerData.pathway.receiver.chain, recipientAddress, destTx.blockNumber);
     const response = this.makeResponse("LayerZero", sourceTx, destinationTx, transactionGroups, tokenGroups);
@@ -252,14 +271,17 @@ export class ApiService {
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
     const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const depositorAddress = layerData.source.tx.from;
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
     const inputAmount = BigInt(parseInt(sourceLogs.data,16));
     const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, sourceProvider);
-    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name": sourceTokenName, "chain": layerData.pathway.sender.chain, "value": inputAmount.toString()};
+    const sourceTx = { "address": depositorAddress, "id": sourceTokenSymbol, "name": sourceTokenName, "chain": layerData.pathway.sender.chain, "value": inputAmount.toString(),
+      "timestamp": srcTimeStamp, "hash": layerData.source.tx.txHash};
 
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destTimeStamp = await this.getTimeStamp('0x'+destTx.blockNumber.toString(16), layerData.pathway.receiver.chain);
 
     const LifiLogs = await this.getLiFiLogsInDestination(destTx.logs);
     const decodedLogData = await this.getDecodedLogsForLifi(LifiLogs)
@@ -268,8 +290,9 @@ export class ApiService {
     const destinationLogs = await this.getTransferLogsInDestination(recipientAddress, destTx.logs);
     const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(destinationLogs.address, destinationProvider);
     const outputAmount = BigInt(parseInt(destinationLogs.data,16));
-    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString()};
 
+    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString(),
+      "timestamp": destTimeStamp, "hash": layerData.destination.tx.txHash};
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(layerData.pathway.receiver.chain, recipientAddress, destTx.blockNumber);
     const response = this.makeResponse("LayerZero", sourceTx, destinationTx, transactionGroups, tokenGroups);
     console.log(response)
@@ -282,13 +305,17 @@ export class ApiService {
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const depositorAddress = layerData.source.tx.from;
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
     const inputAmount = BigInt(parseInt(sourceLogs.data,16));
     const { tokenName: sourceTokenName, tokenSymbol: sourceTokenSymbol } = await this.getTokenInfo(sourceLogs.address, sourceProvider);
-    const sourceTx = {"address": depositorAddress, "id": sourceTokenSymbol, "name": sourceTokenName, "chain": layerData.pathway.sender.chain, "value": inputAmount.toString()};
+    const sourceTx = { "address": depositorAddress, "id": sourceTokenSymbol, "name": sourceTokenName, "chain": layerData.pathway.sender.chain, "value": inputAmount.toString(),
+      "timestamp": srcTimeStamp, "hash": layerData.source.tx.txHash};
+
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
+    const destTimeStamp = await this.getTimeStamp('0x'+destTx.blockNumber.toString(16), layerData.pathway.receiver.chain);
 
     const rangoLogs = await this.getRangoLogsInDestination(destTx.logs);
     const decodedSendTokenData = await this.getDecodedSendTokenEventForRango(rangoLogs)
@@ -298,7 +325,8 @@ export class ApiService {
     const outputAmount = BigInt(decodedSendTokenData.args[outputAmountIdx]);
     const withdrawalLogs = await this.getWithdrawalLogsInDestination(destTx.logs);
     const { tokenName: destinationTokenName, tokenSymbol: destinationTokenSymbol } = await this.getTokenInfo(withdrawalLogs.address, destinationProvider);
-    const destinationTx = {"address": recipientAddress, "id": destinationTokenSymbol, "name":destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString()};
+    const destinationTx = { "address": recipientAddress, "id": destinationTokenSymbol, "name": destinationTokenName, "chain": layerData.pathway.receiver.chain, "value": outputAmount.toString(),
+      "timestamp": destTimeStamp, "hash": layerData.destination.tx.txHash};
 
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(layerData.pathway.receiver.chain, recipientAddress, destTx.blockNumber);
     const response = this.makeResponse("LayerZero", sourceTx, destinationTx, transactionGroups, tokenGroups);
@@ -308,6 +336,7 @@ export class ApiService {
 
   async getRecipientTxListFromAcross(srcTxHash: string, chain: string) { /** Across 프로토콜은 조금 다름 **/
     const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), 'ethereum');
 
     const log = srcTx.logs.find(log => log.address === '0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5'); // Across Protocol
     const decodedLogData = await this.getDecodedLogsForAcrossProtocol(log);
@@ -330,7 +359,8 @@ export class ApiService {
 
 
     const { tokenName, tokenSymbol } = await this.getTokenInfo(tokenAddress, this.mainnetProvider);
-    const sourceTx = {"address":depositorAddress, "id": tokenSymbol, "name":tokenName, "chain": "Mainnet", "value": inputAmount.toString()};
+    const sourceTx = { "address": depositorAddress, "id": tokenSymbol, "name": tokenName, "chain": "ethereum", "value": inputAmount.toString(),
+      "timestamp": srcTimeStamp, "hash": srcTxHash};
     const destinationTx = {"address":recipientAddress, "id": tokenSymbol, "name":tokenName, "chain": chain, "value": outputAmount.toString()};
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(chain, recipientAddress, await this.getBlockNumberByTimeStamp(timeStamp));
     const response = this.makeResponse("Across", sourceTx, destinationTx, transactionGroups, tokenGroups);
@@ -405,10 +435,15 @@ export class ApiService {
       return { tokenName: 'unknown', tokenSymbol: 'unknown' };
     else if(tokenAddress === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
       return { tokenName: 'ETH', tokenSymbol: 'ETH' };
-    const tokenContract = new Contract(tokenAddress, ["function name() view returns (string)", "function symbol() view returns (string)"], provider);
-    const tokenName = await tokenContract.name();
-    const tokenSymbol = await tokenContract.symbol();
-    return { tokenName, tokenSymbol };
+    try {
+      const tokenContract = new Contract(tokenAddress, ["function name() view returns (string)", "function symbol() view returns (string)"], provider);
+      const tokenName = await tokenContract.name();
+      const tokenSymbol = await tokenContract.symbol();
+      return { tokenName, tokenSymbol };
+    } catch (e) {
+      return { tokenName: 'unknown', tokenSymbol: 'unknown' }
+    }
+
   }
 
   private async getDecodedInputData(abi, srcTxHash: string, sourceProvider: Provider) {
@@ -465,7 +500,7 @@ export class ApiService {
     return abi;
   }
 
-  private async getTxInMainnet(txHash: string): Promise<null | Transaction>{
+  private async getTxInMainnet(txHash: string) {
     const requestBody = {
       jsonrpc: "2.0",
       method: "eth_getTransactionByHash",
@@ -499,6 +534,32 @@ export class ApiService {
       )
     );
     return data.result;
+  }
+
+  private async getTimeStamp(blockNumber: string, chain: string){
+    const requestBody = {
+      jsonrpc: "2.0",
+      method: "eth_getBlockByNumber",
+      params: [blockNumber, false],
+      id: 1
+    };
+
+    let url = this.mainnetUrl;
+    if(chain === 'bsc')
+      url = this.bnbUrl;
+    else if(chain === 'arbitrum')
+      url = this.arbiUrl;
+
+    const { data } = await firstValueFrom(
+      this.httpService.post(url, requestBody).pipe(
+        catchError((error: AxiosError) => {
+          console.log("Error fetching transaction history:", error.message);
+          throw new Error("An error occurred while fetching transaction history.");
+        })
+      )
+    );
+    console.log(data.result.timestamp)
+    return parseInt(data.result.timestamp,16) * 1000;
   }
 
 
@@ -575,15 +636,15 @@ export class ApiService {
     // 체인별로 URL과 체인명 설정
     switch (chain) {
       case 'bsc':
-        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=7&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
+        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
         chainName = 'bsc';
         break;
       case 'arbitrum':
-        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=7&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
+        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
         chainName = 'arbitrum';
         break;
       case 'ethereum':
-        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=7&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("ETHERSCAN_API_KEY")}`;
+        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("ETHERSCAN_API_KEY")}`;
         chainName = 'ethereum';
         break;
       default:
@@ -698,15 +759,11 @@ export class ApiService {
 
     for (const tx of transactions) {
       let data = await provider.getTransactionReceipt(tx.hash);
-      let isTransferTransaction = false;
-      if(tx.functionName.toLowerCase()=== 'transfer')
-        isTransferTransaction = true;
-
       tx.methodNames = []; // methodNames 배열 초기화
 
       for (const log of data.logs) {
         const methodName = this.getMethodName(log.topics[0]);
-        if(isTransferTransaction) {
+        if(methodName === 'Transfer') {
           const { tokenName, tokenSymbol } = await this.getTokenInfo(log.address, provider);
           tx.methodNames.push({
             methodName: methodName,
@@ -729,7 +786,6 @@ export class ApiService {
     const tokenGroups = [];
     if (transactions)
       transactionGroups.push(transactions);
-
     return { transactionGroups, tokenGroups };
   }
 

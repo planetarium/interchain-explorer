@@ -17,6 +17,6 @@ export class EventDictionary {
   };
 
   public static getName(signature: string): string {
-    return this.events[signature] || `Unknown Event (${signature})`;
+    return this.events[signature] || `Unknown Event`;
   }
 }
