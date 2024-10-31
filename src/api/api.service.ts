@@ -23,19 +23,17 @@ export class ApiService {
     private readonly methodMapperService: MethodMapperService,
   ) {}
 
-  async selectLogicAndGetRecipientActivities(srcTxHash: string) {
-    let srcTx = await this.getTxInMainnet(srcTxHash);
+  async selectSrcTxAndGetMethodName(srcTxHash: string) {
+    let srcTx = await this.getTx(srcTxHash);
     if (!srcTx) { // 체인을 선택하지 않고 진행하기 위해 예외처리
-      srcTx = await this.getTxInMainnet(srcTxHash, 'bsc');
+      srcTx = await this.getTx(srcTxHash, 'bsc');
       if(!srcTx)
-        srcTx = await this.getTxInMainnet(srcTxHash, 'arbitrum');
+        srcTx = await this.getTx(srcTxHash, 'arbitrum');
     }
     const methodId = this.getMethodId(srcTx);
     if(methodId === undefined)
       return '미구현';
-    const methodName = this.methodMapperService.getMethodName(methodId);
-
-    return this.getRecipientActivities(methodName, srcTxHash)
+    return this.methodMapperService.getMethodName(methodId);
   }
 
   async getRecipientActivities(methodName: string, srcTxHash: string) {
@@ -68,11 +66,12 @@ export class ApiService {
     const destChain = layerData.pathway.receiver.chain;
     const sourceProvider = this.selectProvider(srcChain);
     const destinationProvider = this.selectProvider(destChain);
-    const srcTx = await this.getTxReceiptInMainnet(srcTxHash, srcChain);
+    const srcTx = await this.getTxReceipt(srcTxHash, srcChain);
     const depositorAddress = layerData.source.tx.from;
     const abi = await this.getContractABI(srcTx, srcChain);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), srcChain);
     let { decodedInputData, inputAmountIdx, inputAmount } = await this.parseInputData(abi, srcTxHash, sourceProvider);
+    console.log(decodedInputData);
 
     /** 토큰의 종류를 조회하기 위해 로그에서 전송되는 토큰 정보를 가져옵니다. function name() view returns (string)", "function symbol() view returns (string) **/
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
@@ -85,6 +84,7 @@ export class ApiService {
       "timestamp": srcTimeStamp, "hash": layerData.source.tx.txHash};
     /** 수취자의 계좌를 조회합니다. **/
     let recipientAddress = this.getRecipientAddressFromOFT(decodedInputData, inputAmountIdx);
+
     const destTx = await destinationProvider.getTransactionReceipt(layerData.destination.tx.txHash);
     const destTimeStamp = await this.getTimeStamp('0x'+destTx.blockNumber.toString(16), destChain);
     /** 수취자의 계좌주소를 통해 Transfer 로그를 찾아냅니다. (토큰 주소도 포함되어 있음)**/
@@ -120,7 +120,7 @@ export class ApiService {
     const destChain = layerData.pathway.receiver.chain;
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
-    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceipt(srcTxHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const depositorAddress = layerData.source.tx.from;
@@ -178,7 +178,7 @@ export class ApiService {
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const depositorAddress = layerData.source.tx.from;
-    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceipt(srcTxHash);
     const claimLogs = await this.getClaimLogsInSource(srcTx.logs);
     const recipientAddress = '0x' + claimLogs.data.slice(0, 66).slice(-40);  // First 32 bytes
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
@@ -208,7 +208,7 @@ export class ApiService {
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const depositorAddress = layerData.source.tx.from;
-    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceipt(srcTxHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const LayerZeroLogs = await this.getLayerZeroLogsInSource(srcTx.logs);
@@ -238,7 +238,7 @@ export class ApiService {
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
-    const srcTx = await this.getTxInMainnet(srcTxHash);
+    const srcTx = await this.getTx(srcTxHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
     const depositorAddress = layerData.source.tx.from;
     const sourceTx = { "address": depositorAddress, "id": 'ETH', "name": 'ETH', "chain": layerData.pathway.sender.chain, "value": parseInt(srcTx.value.toString(),16).toString(),
@@ -278,7 +278,7 @@ export class ApiService {
     const layerData = await this.getLayerZeroScanInfo(srcTxHash);
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
-    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceipt(srcTxHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const depositorAddress = layerData.source.tx.from;
@@ -312,7 +312,7 @@ export class ApiService {
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
-    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceipt(srcTxHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const depositorAddress = layerData.source.tx.from;
@@ -343,7 +343,7 @@ export class ApiService {
   }
 
   async getRecipientTxListFromAcross(srcTxHash: string, chain: string) { /** Across 프로토콜은 조금 다름 **/
-    const srcTx = await this.getTxReceiptInMainnet(srcTxHash);
+    const srcTx = await this.getTxReceipt(srcTxHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), 'ethereum');
 
     const log = srcTx.logs.find(log => log.address === '0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5'); // Across Protocol
@@ -499,13 +499,12 @@ export class ApiService {
     if (chain === "bsc")
       url = `https://api.bscscan.com/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
     else if (chain === "arbitrum")
-      url = `https://api.arbiscan.io/api?module=account&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
+      url = `https://api.arbiscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
     else if (chain === "ethereum")
-      url = `https://api.etherscan.io/api?module=account&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ETHEREUM_API_KEY")}`;
+      url = `https://api.etherscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ETHEREUM_API_KEY")}`;
     else {
       throw new Error("Unsupported chain");
     }
-
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
@@ -518,7 +517,7 @@ export class ApiService {
     return abi;
   }
 
-  private async getTxInMainnet(txHash: string, chain?: string) {
+  private async getTx(txHash: string, chain?: string) {
     const requestBody = {
       jsonrpc: "2.0",
       method: "eth_getTransactionByHash",
@@ -543,7 +542,7 @@ export class ApiService {
     return data.result;
   }
 
-  private async getTxReceiptInMainnet(txHash: string, chain?: string): Promise<null | TransactionReceipt>{
+  private async getTxReceipt(txHash: string, chain?: string): Promise<null | TransactionReceipt>{
     const requestBody = {
       jsonrpc: "2.0",
       method: "eth_getTransactionReceipt",
@@ -690,7 +689,6 @@ export class ApiService {
         })
       )
     );
-    console.log(data.result)
 
     for (const tx of data.result) {
       tx.chain = chainName; // 구분을 위한 체인명 삽입

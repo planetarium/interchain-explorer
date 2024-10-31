@@ -7,6 +7,7 @@ export class ApiController {
 
   @Get('/list') // LayerZero Protocol (OFTP, ProxyOFT, Pancake, Stargate)
   async getRecipientActivities(@Query('srcTxHash') srcTxHash: string) {
-    return await this.apiService.selectLogicAndGetRecipientActivities(srcTxHash);
+    const methodName = await this.apiService.selectSrcTxAndGetMethodName(srcTxHash);
+    return this.apiService.getRecipientActivities(methodName, srcTxHash);
   }
 }
