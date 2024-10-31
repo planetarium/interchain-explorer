@@ -499,13 +499,12 @@ export class ApiService {
     if (chain === "bsc")
       url = `https://api.bscscan.com/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
     else if (chain === "arbitrum")
-      url = `https://api.arbiscan.io/api?module=account&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
+      url = `https://api.arbiscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
     else if (chain === "ethereum")
-      url = `https://api.etherscan.io/api?module=account&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ETHEREUM_API_KEY")}`;
+      url = `https://api.etherscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ETHEREUM_API_KEY")}`;
     else {
       throw new Error("Unsupported chain");
     }
-
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
@@ -690,7 +689,6 @@ export class ApiService {
         })
       )
     );
-    console.log(data.result)
 
     for (const tx of data.result) {
       tx.chain = chainName; // 구분을 위한 체인명 삽입
