@@ -254,7 +254,7 @@
 <div class="container">
   <div class="input-section">
     <h2>인터체인 익스플로러</h2>
-    <input type="text" id="txHash" placeholder="Enter Source Transaction Hash" />
+    <input type="text" id="txHash" placeholder="Enter Source/Destination Transaction Hash" />
     <button class="btn" id="getTransactionsBtn" onclick="getTransactions()">검색하기 <span id="getTransactionsLoader" class="loader"></span></button>
     <div id="transactionsResult" class="status"></div>
   </div>
@@ -297,17 +297,23 @@
       loader.style.display = 'inline-block';
 
       try {
-        const response = await fetch(`/api/list?srcTxHash=${txHash}`);
+        const response = await fetch(`/api/list?txHash=${txHash}`);
         const result = await response.json();
-        // Assuming the response is an array of transactions
+
+        if (!response.ok) {
+          // 서버에서 보낸 에러 메시지 출력
+          resultDiv.textContent = `Error: ${result.message}`;
+          resultDiv.className = 'status error';
+          return;
+        }
+        console.log(result);
+
         if (result.length > 0) {
           document.querySelector('.input-section').classList.add('hidden');
           document.querySelector('.result-section').classList.remove('hidden');
-          const {protocol, sourceTx, destinationTx} = result[0];
+          const { protocol, sourceTx, destinationTx } = result[0];
           displayBridge(protocol, sourceTx, destinationTx);
-
           displayMultipleTransactionGroups(result, 'transactionGroups');
-
 
           resultDiv.textContent = 'Transaction details fetched successfully.';
           resultDiv.className = 'status success';
@@ -316,7 +322,7 @@
           resultDiv.className = 'status error';
         }
       } catch (error) {
-        resultDiv.textContent = 'Error checking BNB transactions: ' + error.message;
+        resultDiv.textContent = 'Error checking transactions: ' + error.message;
         resultDiv.className = 'status error';
       } finally {
         button.disabled = false;

@@ -23,55 +23,50 @@ export class ApiService {
     private readonly methodMapperService: MethodMapperService,
   ) {}
 
-  async selectSrcTxAndGetMethodName(srcTxHash: string) {
-    let srcTx = await this.getTx(srcTxHash);
-    if (!srcTx) { // 체인을 선택하지 않고 진행하기 위해 예외처리
-      srcTx = await this.getTx(srcTxHash, 'bsc');
-      if(!srcTx)
-        srcTx = await this.getTx(srcTxHash, 'arbitrum');
-    }
+  async selectSrcTxAndGetMethodName(srcTxHash: string, sourceChain: string) { // 무슨 메서드를 실행시켰는지 알아내기 (OFT 송금, Claim, Airdrop ...)
+    let srcTx = await this.getTx(srcTxHash, sourceChain);
+    if(!srcTx)
+      throw new Error('불가능한 체인이거나 지원하지 않는 메서드입니다.')
     const methodId = this.getMethodId(srcTx);
     if(methodId === undefined)
-      return '미구현';
+      throw new Error(`정의되지 않은 메서드입니다. ${srcTx.input.slice(0,10)}`)
     return this.methodMapperService.getMethodName(methodId);
   }
 
-  async getRecipientActivities(methodName: string, srcTxHash: string) {
+  async getRecipientActivities(methodName: string, providedTxHash: string, layerZeroData) {
     if (methodName === "Unknown Method")
       return;
     if (methodName === "Drive Bus")
-      return this.getRecipientTxListFromDrive(srcTxHash);
+      return this.getRecipientTxListFromDrive(layerZeroData);
     else if (methodName === "stargateSwapAndBridge")
-      return this.getRecipientTxListFromRango(srcTxHash);
+      return this.getRecipientTxListFromRango(layerZeroData);
     else if (methodName === "swapAndStartBridgeTokensViaStargate")
-      return this.getRecipientTxListFromLifi(srcTxHash);
+      return this.getRecipientTxListFromLifi(layerZeroData);
     else if (methodName === "claim")
-      return this.getRecipientTxListFromClaim(srcTxHash);
+      return this.getRecipientTxListFromClaim(layerZeroData);
     else if (methodName === "donateAndClaim")
-      return this.getRecipientTxListFromLayerZero(srcTxHash);
+      return this.getRecipientTxListFromLayerZero(layerZeroData);
     else if (methodName === "swapAndBridge")
-      return this.getRecipientTxListFromBridge(srcTxHash);
+      return this.getRecipientTxListFromBridge(layerZeroData);
     else if (methodName === "deposit")
-      return this.getRecipientTxListFromAcross(srcTxHash, "arbitrum");
+      return this.getRecipientTxListFromAcross(providedTxHash, "arbitrum");
     else if (methodName === "send" || "sendFrom" || "sendOFT" || "sendOFTV2" || "swapBridgeToV2" || "sendProxyOFTV2" || "SendProxyOFTFeeV2")
-      return this.getRecipientTxListFromOFT(srcTxHash);
+      return this.getRecipientTxListFromOFT(layerZeroData);
     else
       return '';
   }
 
 
-  async getRecipientTxListFromOFT(srcTxHash: string) { //src: 인풋, 로그 / dest: 로그
-    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+  async getRecipientTxListFromOFT(layerData) { //src: 인풋, 로그 / dest: 로그
     const srcChain = layerData.pathway.sender.chain;
     const destChain = layerData.pathway.receiver.chain;
     const sourceProvider = this.selectProvider(srcChain);
     const destinationProvider = this.selectProvider(destChain);
-    const srcTx = await this.getTxReceipt(srcTxHash, srcChain);
+    const srcTx = await this.getTxReceipt(layerData.source.tx.txHash, srcChain);
     const depositorAddress = layerData.source.tx.from;
     const abi = await this.getContractABI(srcTx, srcChain);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), srcChain);
-    let { decodedInputData, inputAmountIdx, inputAmount } = await this.parseInputData(abi, srcTxHash, sourceProvider);
-    console.log(decodedInputData);
+    let { decodedInputData, inputAmountIdx, inputAmount } = await this.parseInputData(abi, layerData.source.tx.txHash, sourceProvider);
 
     /** 토큰의 종류를 조회하기 위해 로그에서 전송되는 토큰 정보를 가져옵니다. function name() view returns (string)", "function symbol() view returns (string) **/
     const sourceLogs = await this.getTransferLogsInSource(depositorAddress, srcTx.logs);
@@ -114,19 +109,18 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromBridge(srcTxHash: string) { //src: 인풋, 로그 / dest: 로그
-    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+  async getRecipientTxListFromBridge(layerData) { //src: 인풋, 로그 / dest: 로그
     const srcChain = layerData.pathway.sender.chain;
     const destChain = layerData.pathway.receiver.chain;
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
-    const srcTx = await this.getTxReceipt(srcTxHash);
+    const srcTx = await this.getTxReceipt(layerData.source.tx.txHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const depositorAddress = layerData.source.tx.from;
     const abi = await this.getContractABI(srcTx, srcChain);
 
-    const decodedInputData = await this.getDecodedInputData(abi, srcTxHash, sourceProvider);
+    const decodedInputData = await this.getDecodedInputData(abi, layerData.source.tx.txHash, sourceProvider);
     const BridgeData = decodedInputData.fragment.inputs.find(param => param.name === '_bridgeParams');
     /** InputData 파싱과정 **/
     const inputAmountIdx = BridgeData.components.findIndex(param => param.name === 'amountIn');
@@ -172,13 +166,12 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromClaim(srcTxHash: string) { //src: 로그 / dest: 로그
-    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+  async getRecipientTxListFromClaim(layerData) { //src: 로그 / dest: 로그
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const depositorAddress = layerData.source.tx.from;
-    const srcTx = await this.getTxReceipt(srcTxHash);
+    const srcTx = await this.getTxReceipt(layerData.source.tx.txHash);
     const claimLogs = await this.getClaimLogsInSource(srcTx.logs);
     const recipientAddress = '0x' + claimLogs.data.slice(0, 66).slice(-40);  // First 32 bytes
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
@@ -202,13 +195,12 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromLayerZero(srcTxHash: string) { //src: 커스텀 로그 / dest: 커스텀 로그
-    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+  async getRecipientTxListFromLayerZero(layerData) { //src: 커스텀 로그 / dest: 커스텀 로그
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const depositorAddress = layerData.source.tx.from;
-    const srcTx = await this.getTxReceipt(srcTxHash);
+    const srcTx = await this.getTxReceipt(layerData.source.tx.txHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const LayerZeroLogs = await this.getLayerZeroLogsInSource(srcTx.logs);
@@ -233,12 +225,11 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromDrive(srcTxHash: string) { //src: 로그 / dest: 로그
-    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+  async getRecipientTxListFromDrive(layerData) { //src: 로그 / dest: 로그
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
-    const srcTx = await this.getTx(srcTxHash);
+    const srcTx = await this.getTx(layerData.source.tx.txHash, layerData.pathway.sender.chain);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
     const depositorAddress = layerData.source.tx.from;
     const sourceTx = { "address": depositorAddress, "id": 'ETH', "name": 'ETH', "chain": layerData.pathway.sender.chain, "value": parseInt(srcTx.value.toString(),16).toString(),
@@ -274,11 +265,10 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromLifi(srcTxHash: string) { //src: 로그 / dest: 로그
-    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+  async getRecipientTxListFromLifi(layerData) { //src: 로그 / dest: 로그
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
-    const srcTx = await this.getTxReceipt(srcTxHash);
+    const srcTx = await this.getTxReceipt(layerData.source.tx.txHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const depositorAddress = layerData.source.tx.from;
@@ -307,12 +297,11 @@ export class ApiService {
     return response;
   }
 
-  async getRecipientTxListFromRango(srcTxHash: string) {
-    const layerData = await this.getLayerZeroScanInfo(srcTxHash);
+  async getRecipientTxListFromRango(layerData) {
     const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
-    const srcTx = await this.getTxReceipt(srcTxHash);
+    const srcTx = await this.getTxReceipt(layerData.source.tx.txHash);
     const srcTimeStamp = await this.getTimeStamp(srcTx.blockNumber.toString(), layerData.pathway.sender.chain);
 
     const depositorAddress = layerData.source.tx.from;
@@ -425,8 +414,8 @@ export class ApiService {
   }
 
 
-  private async getLayerZeroScanInfo(srcTxHash: string) {
-    const url = `https://scan.LayerZero-api.com/v1/messages/tx/${srcTxHash}`;
+  async getLayerZeroScanInfo(txHash: string) {
+    const url = `https://scan.LayerZero-api.com/v1/messages/tx/${txHash}`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
@@ -517,7 +506,7 @@ export class ApiService {
     return abi;
   }
 
-  private async getTx(txHash: string, chain?: string) {
+  private async getTx(txHash: string, chain: string) {
     const requestBody = {
       jsonrpc: "2.0",
       method: "eth_getTransactionByHash",

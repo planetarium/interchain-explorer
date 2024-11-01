@@ -18,6 +18,8 @@ $ npm install
 
 ## Running the app
 
+Node version : v22.5.1
+
 ```bash
 # watch mode
 $ npm run start:dev
