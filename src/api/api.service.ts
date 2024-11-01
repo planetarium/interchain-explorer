@@ -578,6 +578,8 @@ export class ApiService {
         })
       )
     );
+    if(!data.result.timestamp)
+      throw new Error("[네트워크 불안정] blockNumber에서 timestamp를 추출하는데 RPC 요청이 제대로 되지 않음. 이는 재시도를 하면 해결 됨. 네트워크 불안정이 원인")
     return parseInt(data.result.timestamp,16) * 1000;
   }
 
