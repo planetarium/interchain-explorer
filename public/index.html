@@ -292,7 +292,7 @@
     }
 
     async function getTransactions() {
-      const txHash = document.getElementById('txHash').value;
+      const enteredTxHash = document.getElementById('txHash').value;
       const button = document.getElementById('getTransactionsBtn');
       const loader = document.getElementById('getTransactionsLoader');
       const resultDiv = document.getElementById('transactionsResult');
@@ -301,7 +301,7 @@
       loader.style.display = 'inline-block';
 
       try {
-        const response = await fetch(`/api/list?txHash=${txHash}`);
+        const response = await fetch(`/api/list?txHash=${enteredTxHash}`);
         const result = await response.json();
 
         if (!response.ok) {
@@ -310,14 +310,13 @@
           resultDiv.className = 'status error';
           return;
         }
-        console.log(result);
 
         if (result.length > 0) {
           document.querySelector('.input-section').classList.add('hidden');
           document.querySelector('.container').classList.add('result');
           document.querySelector('.result-section').classList.remove('hidden');
           const { protocol, sourceTx, destinationTx } = result[0];
-          displayBridge(protocol, sourceTx, destinationTx);
+          displayBridge(enteredTxHash, protocol, sourceTx, destinationTx);
           displayMultipleTransactionGroups(result, 'transactionGroups');
 
           resultDiv.textContent = 'Transaction details fetched successfully.';
@@ -372,7 +371,7 @@
       // 다른 토큰 심볼과 로고를 여기 추가
     };
 
-    function displayBridge(protocol, sourceTx, destinationTx) {
+    function displayBridge(enteredTxHash, protocol, sourceTx, destinationTx) {
       const container = document.getElementById('bridgeInfo');
       container.innerHTML = ''; // Clear existing content
       const srcTimeStamp = new Date(sourceTx.timestamp);
@@ -384,7 +383,7 @@
       srcChain = makeChainName(sourceTx.chain)
       destChain = makeChainName(destinationTx.chain)
       commonInfo.innerHTML = `
-    <p><strong>Entered tx:</strong> ${sourceTx.hash}</p>
+    <p><strong>Entered tx:</strong> ${enteredTxHash}</p>
     <p><strong>Bridge:</strong> ${protocol}, ${srcChain} -> ${destChain}</p>
   `;
 
