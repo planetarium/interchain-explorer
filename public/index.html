@@ -306,7 +306,7 @@
 
         if (!response.ok) {
           // 서버에서 보낸 에러 메시지 출력
-          resultDiv.textContent = `Error: ${result.message}`;
+          resultDiv.textContent = `Error: ${result.message}, 원인 : ${result.stack}`;
           resultDiv.className = 'status error';
           return;
         }

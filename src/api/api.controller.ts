@@ -14,7 +14,11 @@ export class ApiController {
     } catch (error) {
       // 에러 메시지를 JSON으로 클라이언트에 반환
       throw new HttpException(
-        { success: false, message: error.message },
+        {
+          success: false,
+          message: error.message,
+          error: error.stack // 스택 추적 정보를 추가
+        },
         HttpStatus.BAD_REQUEST
       );
     }
