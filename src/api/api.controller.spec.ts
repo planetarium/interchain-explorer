@@ -15,7 +15,7 @@ describe('ApiController', () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
-          envFilePath: '.development.env',
+          envFilePath: '.env.development',
         }),
         HttpModule,
       ],
