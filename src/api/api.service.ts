@@ -419,8 +419,9 @@ export class ApiService {
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
-          console.log("Error fetching transaction history:", error.message);
-          throw new Error("An error occurred while fetching transaction history.");
+          const errMsg = "Failed to fetch transaction history from LayerZeroScan\nMessage: " + error.message;
+          console.log(errMsg);
+          throw new Error(errMsg);
         })
       )
     );
@@ -497,8 +498,9 @@ export class ApiService {
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
-          console.log("Error fetching transaction history:", error.message);
-          throw new Error("An error occurred while fetching transaction history.");
+          const errMsg = "Failed to fetch transaction history from " + chain + " API\nMessage: " + error.message;
+          console.log(errMsg);
+          throw new Error(errMsg);
         })
       )
     );
@@ -523,8 +525,9 @@ export class ApiService {
     const { data } = await firstValueFrom(
       this.httpService.post(url, requestBody).pipe(
         catchError((error: AxiosError) => {
-          console.log("Error fetching transaction history:", error.message);
-          throw new Error("An error occurred while fetching transaction history.");
+          const errMsg = "Failed to fetch transaction history from " + chain + " RPC\nMessage: " + error.message;
+          console.log(errMsg);
+          throw new Error(errMsg);
         })
       )
     );
@@ -548,8 +551,9 @@ export class ApiService {
     const { data } = await firstValueFrom(
       this.httpService.post(url, requestBody).pipe(
         catchError((error: AxiosError) => {
-          console.log("Error fetching transaction history:", error.message);
-          throw new Error("An error occurred while fetching transaction history.");
+          const errMsg = "Failed to fetch transaction history from " + chain + " RPC\nMessage: " + error.message;
+          console.log(errMsg);
+          throw new Error(errMsg);
         })
       )
     );
@@ -573,8 +577,9 @@ export class ApiService {
     const { data } = await firstValueFrom(
       this.httpService.post(url, requestBody).pipe(
         catchError((error: AxiosError) => {
-          console.log("Error fetching transaction history:", error.message);
-          throw new Error("An error occurred while fetching transaction history.");
+          const errMsg = "Failed to fetch transaction history from " + chain + " RPC\nMessage: " + error.message;
+          console.log(errMsg);
+          throw new Error(errMsg);
         })
       )
     );
@@ -675,8 +680,9 @@ export class ApiService {
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
-          console.log("Error fetching transaction history:", error.message);
-          throw new Error("An error occurred while fetching transaction history.");
+          const errMsg = "Failed to fetch transaction history from " + chain + "\nMessage: " + error.message;
+          console.log(errMsg);
+          throw new Error(errMsg);
         })
       )
     );
