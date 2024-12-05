@@ -1,25 +1,24 @@
 import { Injectable } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
-import { ConfigService } from "@nestjs/config";
 import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, Transaction, TransactionDescription, TransactionReceipt } from "ethers";
 import { catchError, firstValueFrom, Observable } from "rxjs";
 import { AxiosError } from "axios";
 import { MethodMapperService } from "../common/method-mapper.service";
 import { EventDictionary } from "../common/event.dictionary";
+import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY } from "../constants/environment";
 
 
 @Injectable()
 export class ApiService {
-  private mainnetProvider = new InfuraProvider("mainnet", this.configService.get('INFURA_API_KEY'));
-  private bnbProvider = new EtherscanProvider('bnb', this.configService.get('BNBSCAN_API_KEY'));
-  private arbitrumProvider = new InfuraProvider('arbitrum', this.configService.get('INFURA_API_KEY'));
-  private mainnetUrl = `https://mainnet.infura.io/v3/${this.configService.get('INFURA_API_KEY')}`;
-  private bnbUrl = `https://bsc-mainnet.infura.io/v3/${this.configService.get('INFURA_API_KEY')}`;
-  private arbiUrl = `https://arbitrum-mainnet.infura.io/v3/${this.configService.get('INFURA_API_KEY')}`;
+  private mainnetProvider = new InfuraProvider("mainnet", INFURA_API_KEY);
+  private bnbProvider = new EtherscanProvider('bnb', BNBSCAN_API_KEY);
+  private arbitrumProvider = new InfuraProvider('arbitrum', INFURA_API_KEY);
+  private mainnetUrl = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`;
+  private bnbUrl = `https://bsc-mainnet.infura.io/v3/${INFURA_API_KEY}`;
+  private arbiUrl = `https://arbitrum-mainnet.infura.io/v3/${INFURA_API_KEY}`;
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
     private readonly methodMapperService: MethodMapperService,
   ) {}
 
@@ -487,11 +486,11 @@ export class ApiService {
   private async getContractABI(srcTx, chain: string) {
     let url = '';
     if (chain === "bsc")
-      url = `https://api.bscscan.com/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
+      url = `https://api.bscscan.com/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${BNBSCAN_API_KEY}`;
     else if (chain === "arbitrum")
-      url = `https://api.arbiscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
+      url = `https://api.arbiscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${ARBITRUM_API_KEY}`;
     else if (chain === "ethereum")
-      url = `https://api.etherscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${this.configService.get("ETHEREUM_API_KEY")}`;
+      url = `https://api.etherscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${ETHEREUM_API_KEY}`;
     else {
       throw new Error("Unsupported chain");
     }
@@ -662,15 +661,15 @@ export class ApiService {
     // 체인별로 URL과 체인명 설정
     switch (chain) {
       case 'bsc':
-        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("BNBSCAN_API_KEY")}`;
+        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BNBSCAN_API_KEY}`;
         chainName = 'bsc';
         break;
       case 'arbitrum':
-        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${this.configService.get("ARBITRUM_API_KEY")}`;
+        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${ARBITRUM_API_KEY}`;
         chainName = 'arbitrum';
         break;
       case 'ethereum':
-        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${this.configService.get("ETHEREUM_API_KEY")}`;
+        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${ETHEREUM_API_KEY}`;
         chainName = 'ethereum';
         break;
       default:
