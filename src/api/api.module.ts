@@ -12,7 +12,7 @@ import { MethodMapperService } from "../common/method-mapper.service";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      cache: false,
+      cache: false
     }),
     ScheduleModule.forRoot(),
     HttpModule,
