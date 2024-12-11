@@ -12,9 +12,7 @@ import { MethodMapperService } from "../common/method-mapper.service";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      cache: false,
-      envFilePath:
-        process.env.NODE_ENV = '.env.development'
+      cache: false
     }),
     ScheduleModule.forRoot(),
     HttpModule,
