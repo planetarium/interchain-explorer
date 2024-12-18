@@ -18,7 +18,7 @@ export class ApiController {
     }
   }
 
-  private async getRecipientActivitiesFromCCTP(@Query('txHash') txHash: string) {
+  private async getRecipientActivitiesFromCCTP(txHash: string) {
     try {
       const txInfo = await this.apiService.getTransactionInfoFromRange(txHash);
       return this.apiService.getRecipientTxListFromCCTP(txInfo);
