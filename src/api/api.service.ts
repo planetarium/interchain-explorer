@@ -6,8 +6,24 @@ import { AxiosError } from "axios";
 import { MethodMapperService } from "../common/method-mapper.service";
 import { EventDictionary } from "../common/event.dictionary";
 import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
-
-
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+interface ParsedData  {
+  id: string;
+  burnHash: string;
+  transferHash: string;
+  from: string;
+  destination: string;
+  fromNetwork: string;
+  destinationNetwork: string;
+  amount: string;
+  denom: string;
+  status: string;
+  fromTimestamp: string;
+  destinationTimestamp: string;
+  fromBlock: string;
+  destinationBlock: string;
+}
 @Injectable()
 export class ApiService {
   private mainnetProvider = new InfuraProvider("mainnet", INFURA_API_KEY);
@@ -23,7 +39,7 @@ export class ApiService {
     private readonly httpService: HttpService,
     private readonly methodMapperService: MethodMapperService
   ) {}
-
+  
   async selectSrcTxAndGetMethodName(srcTxHash: string, sourceChain: string) { // 무슨 메서드를 실행시켰는지 알아내기 (OFT 송금, Claim, Airdrop ...)
     let srcTx = await this.getTx(srcTxHash, sourceChain);
     if(!srcTx)
@@ -458,6 +474,7 @@ export class ApiService {
     ];
     const decoder = new ethers.Interface(acrossProtocolAbi);
     return decoder.parseLog({ topics: log.topics, data: log.data});
+    
   }
 
   private async getDecodedLogsForLifi(log) {
@@ -857,4 +874,40 @@ export class ApiService {
     console.log(response)
     return response;
   }
-}
+
+public async fetchAndParseHtml(hash: string): Promise<any | null> {
+  const url = `https://usdc.range.org/usdc/status/${hash}`;
+  try {
+    const response = await axios.get(url);
+    const html: string = response.data;
+    const $ = cheerio.load(html);
+    //console.log($.html());
+    //console.log($('script'));
+    const scriptTags = $('script').toArray();
+    let jsonData = '';
+    for (const el of scriptTags) {
+        const ch = el.children;
+        for(const ele of ch){
+          if (ele.type === 'text' && ele.data) {
+            const match = ele.data.match(/"data\\":\s*(\{.*?\})\s*\}/s);
+            if (match!==null) {
+              try {
+                const cleanJson = match[1].replace(/\\\"/g, '"');
+                jsonData = JSON.parse(cleanJson);
+
+                console.log("Extracted JSON Data:", jsonData);
+              } catch (error) {
+                console.error("Failed to parse JSON:", error);
+              }
+            } 
+          }
+        }
+      }
+      return jsonData;
+    }
+  catch (error: any) {
+    console.error('Error fetching or parsing HTML:', error.message);
+    return null;
+  }
+}}
+
