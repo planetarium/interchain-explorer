@@ -8,6 +8,7 @@ import { EventDictionary } from "../common/event.dictionary";
 import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { LayerZeroError, CCTPapiError } from '../errors';
 interface ParsedData  {
   id: string;
   burnHash: string;
@@ -39,7 +40,7 @@ export class ApiService {
     private readonly httpService: HttpService,
     private readonly methodMapperService: MethodMapperService
   ) {}
-  
+
   async selectSrcTxAndGetMethodName(srcTxHash: string, sourceChain: string) { // 무슨 메서드를 실행시켰는지 알아내기 (OFT 송금, Claim, Airdrop ...)
     let srcTx = await this.getTx(srcTxHash, sourceChain);
     if(!srcTx)
@@ -438,7 +439,7 @@ export class ApiService {
         catchError((error: AxiosError) => {
           const errMsg = "Failed to fetch transaction history from LayerZeroScan\nMessage: " + error.message;
           console.log(errMsg);
-          throw new Error(errMsg);
+          throw new LayerZeroError(errMsg);
         })
       )
     );

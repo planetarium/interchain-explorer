@@ -1,6 +1,7 @@
 import { Controller, Get, Query, HttpException, HttpStatus,Param,Res } from "@nestjs/common";
 import { ApiService } from "./api.service";
 import { Response } from 'express';
+import { CCTPapiError,LayerZeroError } from "src/errors";
 
 
 @Controller('/api')
@@ -15,11 +16,17 @@ export class ApiController {
       const methodName = await this.apiService.selectSrcTxAndGetMethodName(layerZeroData.source.tx.txHash, layerZeroData.pathway.sender.chain);
       return this.apiService.getRecipientActivities(methodName, txHash, layerZeroData);
     } catch (error) {
-      // LayerZero 에러 발생 시 CCTP로 이동
-      console.error("LayerZero 조회 중 에러 발생. CCTP로 전환:", error.message);
-      return this.getRecipientActivitiesFromCCTP(txHash);
-    }
-  }
+      if (error instanceof LayerZeroError) {
+        console.error("LayerZero 에러 발생. CCTP api로 전환:", error.message);
+        return this.getRecipientActivitiesFromCCTP(txHash);
+      } else if (error instanceof CCTPapiError) {
+        console.error("CCTP api 처리 실패. Range crawling 대체 수행:", error.message);
+        return this.apiService.fetchAndParseHtml(txHash);
+      } else {
+        console.error("알 수 없는 에러 발생:", error.message);
+        throw error; // 최종적으로 핸들링되지 않은 에러를 클라이언트로 반환
+      }
+    }}
 
   private async getRecipientActivitiesFromCCTP(txHash: string) {
     try {
