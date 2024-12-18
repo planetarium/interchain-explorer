@@ -885,7 +885,7 @@ public async fetchAndParseHtml(hash: string): Promise<any | null> {
     //console.log($.html());
     //console.log($('script'));
     const scriptTags = $('script').toArray();
-    let jsonData = '';
+    let jsonData = null;
     for (const el of scriptTags) {
         const ch = el.children;
         for(const ele of ch){
@@ -895,18 +895,65 @@ public async fetchAndParseHtml(hash: string): Promise<any | null> {
               try {
                 const cleanJson = match[1].replace(/\\\"/g, '"');
                 jsonData = JSON.parse(cleanJson);
-
-                console.log("Extracted JSON Data:", jsonData);
+                break;
               } catch (error) {
                 console.error("Failed to parse JSON:", error);
+                return null;
               }
             } 
           }
         }
+        if (jsonData) break;
       }
-      return jsonData;
-    }
-  catch (error: any) {
+      if (!jsonData) {
+        console.error("No JSON data found in HTML.");
+        return null;
+      }
+      // 데이터 정제
+      const srcTx = jsonData.burn_hash;
+      const srcChain = jsonData.from_network;
+      const srcTimeStamp = new Date(jsonData.from_timestamp).getTime();
+      const depositorAddress = jsonData.from;
+      const inputAmount = jsonData.amount;
+      const sourceTx = {
+        address: depositorAddress,
+        id: 'USDC',
+        name: 'USDC',
+        chain: srcChain,
+        value: inputAmount,
+        timestamp: srcTimeStamp,
+        hash: srcTx,};
+        const destChain = jsonData.destination_network;
+        const destHash = jsonData.transfer_hash;
+        const destTimeStamp = new Date(jsonData.destination_timestamp).getTime();
+        const receiptAddress = jsonData.destination;
+        const destinationTx = {
+          address: receiptAddress,
+          id: 'USDC',
+          name: 'USDC',
+          chain: destChain,
+          value: inputAmount,
+          timestamp: destTimeStamp,
+          hash: destHash,
+        };
+        const { transactionGroups, tokenGroups } = await this.makeResponseGroups(
+          destChain,
+          receiptAddress,
+          parseInt(jsonData.destination_block)
+        );
+    
+        // 최종 응답 생성
+        const crawlResponse = this.makeResponse(
+          'CCTP',
+          sourceTx,
+          destinationTx,
+          transactionGroups,
+          tokenGroups
+        );
+    
+        console.log(crawlResponse);
+        return crawlResponse;
+  }catch (error: any) {
     console.error('Error fetching or parsing HTML:', error.message);
     return null;
   }
