@@ -345,6 +345,7 @@
       'Arbitrum': 'https://arbiscan.io',
       'ethereum': 'https://etherscan.io',
       'Mainnet': 'https://etherscan.io',
+      'base': 'https://basescan.org'
       // 필요한 다른 체인과 익스플로러 링크를 여기 추가
     };
     const tokenLogos = {
@@ -386,9 +387,13 @@
     <p><strong>Entered tx:</strong> ${enteredTxHash}</p>
     <p><strong>Bridge:</strong> ${protocol}, ${srcChain} -> ${destChain}</p>
   `;
-
       // Create source transaction details
-      const sourceValue = Number((Number(sourceTx.value) / 10**18).toFixed(4)).toLocaleString();
+      let sourceValue;
+      if(protocol === 'CCTP'){
+        sourceValue = (Number(sourceTx.value) / 1e6).toFixed(6);
+      }else{
+        sourceValue = Number((Number(sourceTx.value) / 10**18).toFixed(4)).toLocaleString();
+      }
       const sourceInfo = document.createElement('div');
       sourceInfo.className = 'bridge-info-card';
       sourceInfo.innerHTML = `
@@ -398,9 +403,13 @@
     <p><strong>Tx hash:</strong> <a href="${explorers[sourceTx.chain]}/tx/${sourceTx.hash}" target="_blank">${sourceTx.hash}</a></p>
     <p><strong>Value:</strong> <b>${sourceValue}</b>  <img src="${tokenLogos[sourceTx.id] || tokenLogos['unknown']}" alt="${sourceTx.id} logo" onerror="this.onerror=null; this.src='${tokenLogos['unknown']}';"><b>${sourceTx.id}</b> Sent to <b>${protocol}</b></p>
   `;
-
       // Create destination transaction details
-      const destinationValue = Number((Number(destinationTx.value) / 10**18).toFixed(4)).toLocaleString(); // Convert value to ETH
+      let destinationValue;
+      if(protocol === 'CCTP'){
+        destinationValue = (Number(destinationTx.value) / 1e6).toFixed(6);
+      }else{
+        destinationValue =  Number((Number(destinationTx.value) / 10**18).toFixed(4)).toLocaleString();
+      }
       const destinationInfo = document.createElement('div');
       destinationInfo.className = 'bridge-info-card';
       destinationInfo.innerHTML = `
@@ -472,7 +481,7 @@
                 value: transaction.methodNames
                   .map(method =>
                     method.methodName.toLowerCase().includes('transfer')
-                      ? `<div><strong>${method.methodName}</strong> (Address: <a href="${explorerBaseURL}/token/${method.address}" target="_blank">${method.address}</a>) <img src="${tokenLogos[method.tokenSymbol]}" alt="${method.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${method.tokenName} (${method.tokenSymbol}) ${Number((Number(method.value) / 10**18).toFixed(4)).toLocaleString()}`
+                      ? `<div><strong>${method.methodName}</strong> (Address: <a href="${explorerBaseURL}/token/${method.address}" target="_blank">${method.address}</a>) <img src="${tokenLogos[method.tokenSymbol]}" alt="${method.tokenName} Logo" style="width: 20px; vertical-align: middle;"> ${method.tokenName} (${method.tokenSymbol}) ${method.value}`
                       : `<div><strong>${method.methodName}</strong></div>`
                   ).join('')
               }

@@ -12,6 +12,17 @@ export class ApiController {
       const methodName = await this.apiService.selectSrcTxAndGetMethodName(layerZeroData.source.tx.txHash, layerZeroData.pathway.sender.chain);
       return this.apiService.getRecipientActivities(methodName, txHash, layerZeroData);
     } catch (error) {
+      // LayerZero 에러 발생 시 CCTP로 이동
+      console.error("LayerZero 조회 중 에러 발생. CCTP로 전환:", error.message);
+      return this.getRecipientActivitiesFromCCTP(txHash);
+    }
+  }
+
+  private async getRecipientActivitiesFromCCTP(txHash: string) {
+    try {
+      const txInfo = await this.apiService.getTransactionInfoFromRange(txHash);
+      return this.apiService.getRecipientTxListFromCCTP(txInfo);
+    } catch (error) {
       // 에러 메시지를 JSON으로 클라이언트에 반환
       throw new HttpException(
         {

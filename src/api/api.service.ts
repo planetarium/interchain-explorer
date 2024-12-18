@@ -5,7 +5,7 @@ import { catchError, firstValueFrom, Observable } from "rxjs";
 import { AxiosError } from "axios";
 import { MethodMapperService } from "../common/method-mapper.service";
 import { EventDictionary } from "../common/event.dictionary";
-import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY } from "../constants/environment";
+import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
 
 
 @Injectable()
@@ -13,13 +13,15 @@ export class ApiService {
   private mainnetProvider = new InfuraProvider("mainnet", INFURA_API_KEY);
   private bnbProvider = new EtherscanProvider('bnb', BNBSCAN_API_KEY);
   private arbitrumProvider = new InfuraProvider('arbitrum', INFURA_API_KEY);
+  private baseProvider = new InfuraProvider('base', INFURA_API_KEY);
   private mainnetUrl = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`;
   private bnbUrl = `https://bsc-mainnet.infura.io/v3/${INFURA_API_KEY}`;
   private arbiUrl = `https://arbitrum-mainnet.infura.io/v3/${INFURA_API_KEY}`;
+  private baseUrl = `https://base-mainnet.infura.io/v3/${INFURA_API_KEY}`;
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly methodMapperService: MethodMapperService,
+    private readonly methodMapperService: MethodMapperService
   ) {}
 
   async selectSrcTxAndGetMethodName(srcTxHash: string, sourceChain: string) { // 무슨 메서드를 실행시켰는지 알아내기 (OFT 송금, Claim, Airdrop ...)
@@ -520,6 +522,8 @@ export class ApiService {
       url = this.bnbUrl;
     else if(chain === 'arbitrum')
       url = this.arbiUrl;
+    else if(chain === 'base')
+      url = this.baseUrl;
 
     const { data } = await firstValueFrom(
       this.httpService.post(url, requestBody).pipe(
@@ -546,6 +550,8 @@ export class ApiService {
       url = this.bnbUrl;
     else if(chain === 'arbitrum')
       url = this.arbiUrl;
+    else if (chain === "base")
+      url = this.baseUrl;
 
     const { data } = await firstValueFrom(
       this.httpService.post(url, requestBody).pipe(
@@ -572,6 +578,8 @@ export class ApiService {
       url = this.bnbUrl;
     else if(chain === 'arbitrum')
       url = this.arbiUrl;
+    else if (chain === "base")
+      url = this.baseUrl;
 
     const { data } = await firstValueFrom(
       this.httpService.post(url, requestBody).pipe(
@@ -672,6 +680,10 @@ export class ApiService {
         url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${ETHEREUM_API_KEY}`;
         chainName = 'ethereum';
         break;
+      case 'base':
+        url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BASE_API_KEY}`;
+        chainName = 'base';
+        break;
       default:
         throw new Error("Unsupported chain");
     }
@@ -721,6 +733,8 @@ export class ApiService {
       provider = this.arbitrumProvider;
     else if (chain === "ethereum")
       provider = this.mainnetProvider;
+    else if (chain === "base")
+      provider = this.baseProvider;
     return provider;
   }
 
@@ -744,7 +758,7 @@ export class ApiService {
             address: log.address,
             tokenName: tokenName,
             tokenSymbol: tokenSymbol,
-            value: parseInt(log.data, 16)
+            value: tokenSymbol==='USDC'?(parseInt(log.data, 16) / 1e6).toLocaleString():Number((parseInt(log.data, 16) / 10**18).toFixed(4)).toLocaleString()
           });
         }
         else {
@@ -782,5 +796,65 @@ export class ApiService {
 
   private getMethodName(signature: string) {
     return EventDictionary.getName(signature);
+  }
+
+  async getTransactionInfoFromRange(txHash: string) {
+    const url = 'https://usdc.range.org/usdc/api/transfers';
+    const { data } = await firstValueFrom(
+      this.httpService.get(url, {
+        params: {
+          txHash,
+          txnType: 'MAINNET',
+          limit: 1,
+          direction: 'first',
+          source: 'ethereum,base,arbitrum',
+          destination: 'ethereum,base,arbitrum',
+          status: '',
+          min_usd: '',
+          max_usd: ''
+        }
+      }).pipe(
+        catchError((error: AxiosError) => {
+          const errMsg = "Failed to fetch transaction info from Range API\nMessage: " + error.message;
+          console.error(errMsg);
+          throw new Error(errMsg);
+        })
+      )
+    );
+    return data.resources[0];
+  }
+
+  async getRecipientTxListFromCCTP(txInfo) {
+    const srcTx = txInfo.burn_hash;
+    const srcChain = txInfo.from_network;
+    const srcTimeStamp = new Date(txInfo.from_timestamp).getTime();
+    const depositorAddress = txInfo.from;
+    const inputAmount = txInfo.amount;
+    const sourceTx = {
+      "address": depositorAddress,
+      "id": 'USDC',
+      "name": 'USDC',
+      "chain": srcChain,
+      "value": inputAmount,
+      "timestamp": srcTimeStamp,
+      "hash": srcTx
+    };
+    const destChain = txInfo.destination_network;
+    const destHash = txInfo.transfer_hash;
+    const destTimeStamp = new Date(txInfo.destination_timestamp).getTime();
+    const receiptAddress = txInfo.destination;
+    const destinationTx = {
+      "address": receiptAddress,
+      "id": 'USDC',
+      "name": 'USDC',
+      "chain": destChain,
+      "value": inputAmount,
+      "timestamp": destTimeStamp,
+      "hash": destHash
+    };
+    const { transactionGroups, tokenGroups } = await this.makeResponseGroups(destChain, receiptAddress, parseInt(txInfo.destination_block));
+    const response = this.makeResponse("CCTP", sourceTx, destinationTx, transactionGroups, tokenGroups);
+    console.log(response)
+    return response;
   }
 }
