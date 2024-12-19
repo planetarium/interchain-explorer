@@ -35,8 +35,6 @@
     "reflect-metadata": "^0.2.0",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
-    "dotenv": "^16.4.7",
-    "ethers": "^6.13.4",
     "htmlparser2": "^9.1.0",
     "rxjs": "^7.8.1"
   },

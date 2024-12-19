@@ -9,22 +9,6 @@ import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BA
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { LayerZeroError, CCTPapiError } from '../errors';
-interface ParsedData  {
-  id: string;
-  burnHash: string;
-  transferHash: string;
-  from: string;
-  destination: string;
-  fromNetwork: string;
-  destinationNetwork: string;
-  amount: string;
-  denom: string;
-  status: string;
-  fromTimestamp: string;
-  destinationTimestamp: string;
-  fromBlock: string;
-  destinationBlock: string;
-}
 @Injectable()
 export class ApiService {
   private mainnetProvider = new InfuraProvider("mainnet", INFURA_API_KEY);
@@ -835,7 +819,7 @@ export class ApiService {
         catchError((error: AxiosError) => {
           const errMsg = "Failed to fetch transaction info from Range API\nMessage: " + error.message;
           console.error(errMsg);
-          throw new Error(errMsg);
+          throw new CCTPapiError(errMsg);
         })
       )
     );
@@ -957,5 +941,6 @@ public async fetchAndParseHtml(hash: string): Promise<any | null> {
     console.error('Error fetching or parsing HTML:', error.message);
     return null;
   }
-}}
+}
+}
 
