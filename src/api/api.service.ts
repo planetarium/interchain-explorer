@@ -6,8 +6,9 @@ import { AxiosError } from "axios";
 import { MethodMapperService } from "../common/method-mapper.service";
 import { EventDictionary } from "../common/event.dictionary";
 import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
-
-
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import { LayerZeroError, CCTPapiError } from '../errors';
 @Injectable()
 export class ApiService {
   private mainnetProvider = new InfuraProvider("mainnet", INFURA_API_KEY);
@@ -422,7 +423,7 @@ export class ApiService {
         catchError((error: AxiosError) => {
           const errMsg = "Failed to fetch transaction history from LayerZeroScan\nMessage: " + error.message;
           console.log(errMsg);
-          throw new Error(errMsg);
+          throw new LayerZeroError(errMsg);
         })
       )
     );
@@ -458,6 +459,7 @@ export class ApiService {
     ];
     const decoder = new ethers.Interface(acrossProtocolAbi);
     return decoder.parseLog({ topics: log.topics, data: log.data});
+    
   }
 
   private async getDecodedLogsForLifi(log) {
@@ -817,7 +819,7 @@ export class ApiService {
         catchError((error: AxiosError) => {
           const errMsg = "Failed to fetch transaction info from Range API\nMessage: " + error.message;
           console.error(errMsg);
-          throw new Error(errMsg);
+          throw new CCTPapiError(errMsg);
         })
       )
     );
@@ -857,4 +859,88 @@ export class ApiService {
     console.log(response)
     return response;
   }
+
+public async fetchAndParseHtml(hash: string): Promise<any | null> {
+  const url = `https://usdc.range.org/usdc/status/${hash}`;
+  try {
+    const response = await axios.get(url);
+    const html: string = response.data;
+    const $ = cheerio.load(html);
+    //console.log($.html());
+    //console.log($('script'));
+    const scriptTags = $('script').toArray();
+    let jsonData = null;
+    for (const el of scriptTags) {
+        const ch = el.children;
+        for(const ele of ch){
+          if (ele.type === 'text' && ele.data) {
+            const match = ele.data.match(/"data\\":\s*(\{.*?\})\s*\}/s);
+            if (match!==null) {
+              try {
+                const cleanJson = match[1].replace(/\\\"/g, '"');
+                jsonData = JSON.parse(cleanJson);
+                break;
+              } catch (error) {
+                console.error("Failed to parse JSON:", error);
+                return null;
+              }
+            } 
+          }
+        }
+        if (jsonData) break;
+      }
+      if (!jsonData) {
+        console.error("No JSON data found in HTML.");
+        return null;
+      }
+      // 데이터 정제
+      const srcTx = jsonData.burn_hash;
+      const srcChain = jsonData.from_network;
+      const srcTimeStamp = new Date(jsonData.from_timestamp).getTime();
+      const depositorAddress = jsonData.from;
+      const inputAmount = jsonData.amount;
+      const sourceTx = {
+        address: depositorAddress,
+        id: 'USDC',
+        name: 'USDC',
+        chain: srcChain,
+        value: inputAmount,
+        timestamp: srcTimeStamp,
+        hash: srcTx,};
+        const destChain = jsonData.destination_network;
+        const destHash = jsonData.transfer_hash;
+        const destTimeStamp = new Date(jsonData.destination_timestamp).getTime();
+        const receiptAddress = jsonData.destination;
+        const destinationTx = {
+          address: receiptAddress,
+          id: 'USDC',
+          name: 'USDC',
+          chain: destChain,
+          value: inputAmount,
+          timestamp: destTimeStamp,
+          hash: destHash,
+        };
+        const { transactionGroups, tokenGroups } = await this.makeResponseGroups(
+          destChain,
+          receiptAddress,
+          parseInt(jsonData.destination_block)
+        );
+    
+        // 최종 응답 생성
+        const crawlResponse = this.makeResponse(
+          'CCTP',
+          sourceTx,
+          destinationTx,
+          transactionGroups,
+          tokenGroups
+        );
+    
+        console.log(crawlResponse);
+        return crawlResponse;
+  }catch (error: any) {
+    console.error('Error fetching or parsing HTML:', error.message);
+    return null;
+  }
 }
+}
+
