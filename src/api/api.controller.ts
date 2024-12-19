@@ -29,7 +29,7 @@ export class ApiController {
           );
         })(),
       ]);
-  
+
       return recipientActivities;
     } catch (error) {
       if (error instanceof LayerZeroError) {
