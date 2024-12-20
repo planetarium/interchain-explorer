@@ -8,25 +8,45 @@ import { CCTPapiError,LayerZeroError } from "src/errors";
 export class ApiController {
   constructor(private readonly apiService: ApiService) {
   }
-
-  @Get('/list') // LayerZero Protocol (OFTP, ProxyOFT, Pancake, Stargate)
+  @Get('/list')
   async getRecipientActivities(@Query('txHash') txHash: string) {
     try {
       const layerZeroData = await this.apiService.getLayerZeroScanInfo(txHash);
-      const methodName = await this.apiService.selectSrcTxAndGetMethodName(layerZeroData.source.tx.txHash, layerZeroData.pathway.sender.chain);
-      return this.apiService.getRecipientActivities(methodName, txHash, layerZeroData);
+      const [methodName, recipientActivities] = await Promise.all([
+        this.apiService.selectSrcTxAndGetMethodName(
+          layerZeroData.source.tx.txHash,
+          layerZeroData.pathway.sender.chain
+        ),
+        (async () => {
+          const methodName = await this.apiService.selectSrcTxAndGetMethodName(
+            layerZeroData.source.tx.txHash,
+            layerZeroData.pathway.sender.chain
+          );
+          return this.apiService.getRecipientActivities(
+            methodName,
+            txHash,
+            layerZeroData
+          );
+        })(),
+      ]);
+
+      return recipientActivities;
     } catch (error) {
       if (error instanceof LayerZeroError) {
         console.error("LayerZero 에러 발생. CCTP api로 전환:", error.message);
-        return this.getRecipientActivitiesFromCCTP(txHash);
+        const result = await this.getRecipientActivitiesFromCCTP(txHash);
+        return result;
       } else if (error instanceof CCTPapiError) {
-        console.error("CCTP api 처리 실패. Range crawling 대체 수행:", error.message);
-        return this.apiService.fetchAndParseHtml(txHash);
+        console.error("CCTP api 처리 실패. Range 크롤링 대체 수행:", error.message);
+        const result = await this.apiService.fetchAndParseHtml(txHash);
+        return result;
       } else {
         console.error("알 수 없는 에러 발생:", error.message);
-        throw error; // 최종적으로 핸들링되지 않은 에러를 클라이언트로 반환
+        throw error;
       }
-    }}
+    }
+  }
+
 
   private async getRecipientActivitiesFromCCTP(txHash: string) {
     try {
