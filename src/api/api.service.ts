@@ -831,8 +831,10 @@ export class ApiService {
   private async getUsdcTransferLogsInSource(chain: string, depositorAddress: string, recipientAddress: string, logs) {
     const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
     const filteredLog = logs
-      .filter(log => log.topics[0] === transferCode && '0x' + log.topics[1].slice(-40).toLowerCase() === recipientAddress.toLowerCase()
-        && '0x' + log.topics[2].slice(-40).toLowerCase() === depositorAddress.toLowerCase() && log.address.toLowerCase() === USDC_ADDRESSES_MAP[chain]);
+      .filter(log => log.topics[0] === transferCode
+        && log.address.toLowerCase() === USDC_ADDRESSES_MAP[chain]
+        && '0x' + log.topics[1].slice(-40).toLowerCase() === recipientAddress
+        && '0x' + log.topics[2].slice(-40).toLowerCase() === depositorAddress);
     return filteredLog[0];
   }
 
@@ -842,7 +844,7 @@ export class ApiService {
     const srcTx = await this.getTxReceipt(srcHash, srcChain);
     const srcTimeStamp = new Date(txInfo.from_timestamp).getTime();
     const depositorAddress = txInfo.from;
-    const sourceLogs = await this.getUsdcTransferLogsInSource(srcChain, depositorAddress, txInfo.destination, srcTx.logs);
+    const sourceLogs = await this.getUsdcTransferLogsInSource(srcChain, depositorAddress.toLowerCase(), txInfo.destination.toLowerCase(), srcTx.logs);
     let inputAmount = txInfo.amount;
     if (sourceLogs) inputAmount = BigInt(parseInt(sourceLogs.data, 16)).toString();
     const sourceTx = {
