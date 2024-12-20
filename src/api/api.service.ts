@@ -9,6 +9,8 @@ import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BA
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { LayerZeroError, CCTPapiError } from '../errors';
+import { USDC_ADDRESSES_MAP } from "../common/usdc-address";
+
 @Injectable()
 export class ApiService {
   private mainnetProvider = new InfuraProvider("mainnet", INFURA_API_KEY);
@@ -826,12 +828,25 @@ export class ApiService {
     return data.resources[0];
   }
 
+  private async getUsdcTransferLogsInSource(chain: string, depositorAddress: string, recipientAddress: string, logs) {
+    const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const filteredLog = logs
+      .filter(log => log.topics[0] === transferCode
+        && log.address.toLowerCase() === USDC_ADDRESSES_MAP[chain]
+        && '0x' + log.topics[1].slice(-40).toLowerCase() === recipientAddress
+        && '0x' + log.topics[2].slice(-40).toLowerCase() === depositorAddress);
+    return filteredLog[0];
+  }
+
   async getRecipientTxListFromCCTP(txInfo) {
-    const srcTx = txInfo.burn_hash;
     const srcChain = txInfo.from_network;
+    const srcHash = txInfo.burn_hash
+    const srcTx = await this.getTxReceipt(srcHash, srcChain);
     const srcTimeStamp = new Date(txInfo.from_timestamp).getTime();
     const depositorAddress = txInfo.from;
-    const inputAmount = txInfo.amount;
+    const sourceLogs = await this.getUsdcTransferLogsInSource(srcChain, depositorAddress.toLowerCase(), txInfo.destination.toLowerCase(), srcTx.logs);
+    let inputAmount = txInfo.amount;
+    if (sourceLogs) inputAmount = BigInt(parseInt(sourceLogs.data, 16)).toString();
     const sourceTx = {
       "address": depositorAddress,
       "id": 'USDC',
@@ -839,7 +854,7 @@ export class ApiService {
       "chain": srcChain,
       "value": inputAmount,
       "timestamp": srcTimeStamp,
-      "hash": srcTx
+      "hash": srcHash
     };
     const destChain = txInfo.destination_network;
     const destHash = txInfo.transfer_hash;
@@ -850,7 +865,7 @@ export class ApiService {
       "id": 'USDC',
       "name": 'USDC',
       "chain": destChain,
-      "value": inputAmount,
+      "value": txInfo.amount,
       "timestamp": destTimeStamp,
       "hash": destHash
     };
@@ -908,6 +923,7 @@ export class ApiService {
         timestamp: srcTimeStamp,
         hash: srcTx,
       };
+
       const destChain = jsonData.destination_network;
       const destHash = jsonData.transfer_hash;
       const destTimeStamp = new Date(jsonData.destination_timestamp).getTime();
