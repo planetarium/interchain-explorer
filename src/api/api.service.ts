@@ -921,7 +921,8 @@ export class ApiService {
         chain: srcChain,
         value: inputAmount,
         timestamp: srcTimeStamp,
-        hash: srcTx,};
+        hash: srcTx,
+      };
 
       const destChain = jsonData.destination_network;
       const destHash = jsonData.transfer_hash;
@@ -953,7 +954,7 @@ export class ApiService {
 
       console.log(crawlResponse);
       return crawlResponse;
-    }catch (error: any) {
+    } catch (error: any) {
       console.error('Error fetching or parsing HTML:', error.message);
       return null;
     }
