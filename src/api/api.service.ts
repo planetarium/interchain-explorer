@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, Transaction, TransactionDescription, TransactionReceipt } from "ethers";
-import { catchError, firstValueFrom, Observable } from "rxjs";
+import { catchError, filter, firstValueFrom, take, map, defaultIfEmpty, mergeMap, toArray, from} from "rxjs";
 import { AxiosError } from "axios";
 import { MethodMapperService } from "../common/method-mapper.service";
 import { EventDictionary } from "../common/event.dictionary";
@@ -673,19 +673,19 @@ export class ApiService {
     // 체인별로 URL과 체인명 설정
     switch (chain) {
       case 'bsc':
-        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BNBSCAN_API_KEY}`;
+        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BNBSCAN_API_KEY}`;
         chainName = 'bsc';
         break;
       case 'arbitrum':
-        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${ARBITRUM_API_KEY}`;
+        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${ARBITRUM_API_KEY}`;
         chainName = 'arbitrum';
         break;
       case 'ethereum':
-        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${ETHEREUM_API_KEY}`;
+        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${ETHEREUM_API_KEY}`;
         chainName = 'ethereum';
         break;
       case 'base':
-        url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BASE_API_KEY}`;
+        url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BASE_API_KEY}`;
         chainName = 'base';
         break;
       default:
@@ -694,6 +694,12 @@ export class ApiService {
 
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
+        mergeMap((response: any) => from(response.data.result)), // response.data.result를 개별 요소로 변환
+        filter((tx: { from: string }) => tx.from.toLowerCase() === address.toLowerCase()),
+        take(5), // 부합하는 5개 값을 찾으면 종료
+        toArray(), // 배열로 변환
+        map((result: any[]) => ({ data: { result } })), // 원래 구조로 변환
+        defaultIfEmpty({ data: { result: [] } }), // 기본값 설정
         catchError((error: AxiosError) => {
           const errMsg = "Failed to fetch transaction history from " + chain + "\nMessage: " + error.message;
           console.log(errMsg);
@@ -702,13 +708,9 @@ export class ApiService {
       )
     );
 
-    for (const tx of data.result) {
-      tx.chain = chainName; // 구분을 위한 체인명 삽입
-    }
-    if (data.message === "OK") {
-      return data.result;
+    if (data.result.length > 0) {
+      return data.result.map((tx: any) => ({ ...tx, chain: chainName }));
     } else {
-      console.log(data.message);
       return '';
     }
   }
