@@ -711,6 +711,7 @@ export class ApiService {
     if (data.result.length > 0) {
       return data.result.map((tx: any) => ({ ...tx, chain: chainName }));
     } else {
+      console.log("No transactions afterwards on the destination chain.");
       return '';
     }
   }
