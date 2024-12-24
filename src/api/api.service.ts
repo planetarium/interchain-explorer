@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, Transaction, TransactionDescription, TransactionReceipt } from "ethers";
-import { catchError, firstValueFrom, Observable } from "rxjs";
+import { catchError, firstValueFrom } from "rxjs";
 import { AxiosError } from "axios";
+import { DatabaseService } from "./api.db.service.js";
 import { MethodMapperService } from "../common/method-mapper.service";
 import { EventDictionary } from "../common/event.dictionary";
 import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
@@ -24,7 +25,8 @@ export class ApiService {
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly methodMapperService: MethodMapperService
+    private readonly methodMapperService: MethodMapperService,
+    private readonly databaseService: DatabaseService
   ) {}
 
   async selectSrcTxAndGetMethodName(srcTxHash: string, sourceChain: string) { // 무슨 메서드를 실행시켰는지 알아내기 (OFT 송금, Claim, Airdrop ...)
@@ -36,29 +38,81 @@ export class ApiService {
       throw new Error(`정의되지 않은 메서드입니다. ${srcTx.input.slice(0,10)}`)
     return this.methodMapperService.getMethodName(methodId);
   }
-
-  async getRecipientActivities(methodName: string, providedTxHash: string, layerZeroData) {
-    if (methodName === "Unknown Method")
-      return;
-    if (methodName === "Drive Bus")
-      return this.getRecipientTxListFromDrive(layerZeroData);
-    else if (methodName === "stargateSwapAndBridge")
-      return this.getRecipientTxListFromRango(layerZeroData);
-    else if (methodName === "swapAndStartBridgeTokensViaStargate")
-      return this.getRecipientTxListFromLifi(layerZeroData);
-    else if (methodName === "claim")
-      return this.getRecipientTxListFromClaim(layerZeroData);
-    else if (methodName === "donateAndClaim")
-      return this.getRecipientTxListFromLayerZero(layerZeroData);
-    else if (methodName === "swapAndBridge")
-      return this.getRecipientTxListFromBridge(layerZeroData);
-    else if (methodName === "deposit")
-      return this.getRecipientTxListFromAcross(providedTxHash, "arbitrum");
-    else if (methodName === "send" || "sendFrom" || "sendOFT" || "sendOFTV2" || "swapBridgeToV2" || "sendProxyOFTV2" || "SendProxyOFTFeeV2")
-      return this.getRecipientTxListFromOFT(layerZeroData);
-    else
-      return '';
+  async getRecipientActivities(
+    methodName: string,
+    providedTxHash: string,
+    layerZeroData
+  ) {
+    if (methodName === "Unknown Method") return;
+  
+    let result;
+    switch (methodName) {
+      case "Drive Bus":
+        result = await this.getRecipientTxListFromDrive(layerZeroData);
+        break;
+      case "stargateSwapAndBridge":
+        result = await this.getRecipientTxListFromRango(layerZeroData);
+        break;
+      case "swapAndStartBridgeTokensViaStargate":
+        result = await this.getRecipientTxListFromLifi(layerZeroData);
+        break;
+      case "claim":
+        result = await this.getRecipientTxListFromClaim(layerZeroData);
+        break;
+      case "donateAndClaim":
+        result = await this.getRecipientTxListFromLayerZero(layerZeroData);
+        break;
+      case "swapAndBridge":
+        result = await this.getRecipientTxListFromBridge(layerZeroData);
+        break;
+      case "deposit":
+        result = await this.getRecipientTxListFromAcross(providedTxHash, "arbitrum");
+        break;
+      case "send":
+      case "sendFrom":
+      case "sendOFT":
+      case "sendOFTV2":
+      case "swapBridgeToV2":
+      case "sendProxyOFTV2":
+      case "SendProxyOFTFeeV2":
+        result = await this.getRecipientTxListFromOFT(layerZeroData);
+        break;
+      default:
+        result = '';
+    }
+    if (Array.isArray(result)) {
+      await this.databaseService.saveTransaction({ contents: result });
+      console.log('Saved array to database:', result);
+    } else {
+      await this.databaseService.saveTransaction({ contents: result });
+      console.log('Saved result to database:', result);
+    }
+  
+    return result;
   }
+
+  // async getRecipientActivities(methodName: string, providedTxHash: string, layerZeroData) {
+  //   if (methodName === "Unknown Method")
+  //     return;
+  //   if (methodName === "Drive Bus")
+  //     return this.getRecipientTxListFromDrive(layerZeroData);
+  //   else if (methodName === "stargateSwapAndBridge")
+  //     return this.getRecipientTxListFromRango(layerZeroData);
+  //   else if (methodName === "swapAndStartBridgeTokensViaStargate")
+  //     return this.getRecipientTxListFromLifi(layerZeroData);
+  //   else if (methodName === "claim")
+  //     return this.getRecipientTxListFromClaim(layerZeroData);
+  //   else if (methodName === "donateAndClaim")
+  //     return this.getRecipientTxListFromLayerZero(layerZeroData);
+  //   else if (methodName === "swapAndBridge")
+  //     return this.getRecipientTxListFromBridge(layerZeroData);
+  //   else if (methodName === "deposit")
+  //     return this.getRecipientTxListFromAcross(providedTxHash, "arbitrum");
+  //   else if (methodName === "send" || "sendFrom" || "sendOFT" || "sendOFTV2" || "swapBridgeToV2" || "sendProxyOFTV2" || "SendProxyOFTFeeV2")
+  //     return this.getRecipientTxListFromOFT(layerZeroData);
+  //   else
+  //     return '';
+  // }
 
 
   async getRecipientTxListFromOFT(layerData) { //src: 인풋, 로그 / dest: 로그

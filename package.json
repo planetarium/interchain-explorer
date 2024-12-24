@@ -30,12 +30,13 @@
     "@nestjs/serve-static": "^4.0.2",
     "@vendia/serverless-express": "^4.12.6",
     "aws-lambda": "^1.0.7",
-    "dotenv": "^16.4.7",
-    "ethers": "^6.13.2",
-    "reflect-metadata": "^0.2.0",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.2",
     "htmlparser2": "^9.1.0",
+    "pg": "^8.13.1",
+    "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
