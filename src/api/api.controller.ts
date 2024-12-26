@@ -1,16 +1,26 @@
 import { Controller, Get, Query, HttpException, HttpStatus,Param,Res } from "@nestjs/common";
 import { ApiService } from "./api.service";
+import { DatabaseService } from "./api.db.service.js";
 import { Response } from 'express';
 import { CCTPapiError,LayerZeroError } from "src/errors";
 
 
 @Controller('/api')
 export class ApiController {
-  constructor(private readonly apiService: ApiService) {
+  constructor(private readonly apiService: ApiService,private readonly databaseService: DatabaseService) {
   }
+
   @Get('/list')
   async getRecipientActivities(@Query('txHash') txHash: string) {
     try {
+      // 1. DB에서 hash 값 조회
+    const cachedTransaction = await this.databaseService.findTransactionByHash(txHash);
+    if (cachedTransaction) {
+      console.log(`테이블에 ${txHash} 값이 존재합니다.`);
+      return cachedTransaction.contents; // 조회된 결과 반환
+    }
+
+    // 2. LayerZero 데이터를 가져옴
       const layerZeroData = await this.apiService.getLayerZeroScanInfo(txHash);
       const [methodName, recipientActivities] = await Promise.all([
         this.apiService.selectSrcTxAndGetMethodName(
@@ -22,7 +32,7 @@ export class ApiController {
             layerZeroData.source.tx.txHash,
             layerZeroData.pathway.sender.chain
           );
-          return this.apiService.getRecipientActivities(
+          return this.apiService.getRecipientActivities(//저장
             methodName,
             txHash,
             layerZeroData
@@ -31,13 +41,13 @@ export class ApiController {
       ]);
 
       return recipientActivities;
-    } catch (error) {
+    } catch (error) {// 2. CCTP 데이터를 가져옴
       if (error instanceof LayerZeroError) {
         console.error("LayerZero 에러 발생. CCTP api로 전환:", error.message);
         const result = await this.getRecipientActivitiesFromCCTP(txHash);
         return result;
       } else if (error instanceof CCTPapiError) {
-        console.error("CCTP api 처리 실패. Range 크롤링 대체 수행:", error.message);
+        console.error("CCTP api 처리 실패. Range 크롤링 대체 수행:", error.message);//추가 가능
         const result = await this.apiService.fetchAndParseHtml(txHash);
         return result;
       } else {

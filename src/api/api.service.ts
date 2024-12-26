@@ -81,10 +81,10 @@ export class ApiService {
         result = '';
     }
     if (Array.isArray(result)) {
-      await this.databaseService.saveTransaction({ contents: result });
+      await this.databaseService.saveTransaction({ txHash: providedTxHash, contents: result });
       console.log('Saved array to database:', result);
     } else {
-      await this.databaseService.saveTransaction({ contents: result });
+      await this.databaseService.saveTransaction({ txHash: providedTxHash, contents: result });
       console.log('Saved result to database:', result);
     }
   
@@ -929,6 +929,14 @@ export class ApiService {
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(destChain, receiptAddress, parseInt(txInfo.destination_block));
     const response = this.makeResponse("CCTP", sourceTx, destinationTx, transactionGroups, tokenGroups);
     console.log(response)
+    if (Array.isArray(response)) {
+      await this.databaseService.saveTransaction({ txHash: srcHash, contents: response });
+      console.log('Saved array to database:', response);
+    } else {
+      await this.databaseService.saveTransaction({ txHash: srcHash, contents: response });
+      console.log('Saved result to database:', response);
+    }
+  
     return response;
   }
 

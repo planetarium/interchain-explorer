@@ -9,7 +9,7 @@ export class DatabaseService {
     this.pool = new Pool({
       user: 'root',
       host: 'localhost',
-      database: 'postgres',
+      database: 'interchain_db',
       password: '1234',
       port: '5432',
     });
@@ -35,6 +35,7 @@ export class DatabaseService {
       const tableQuery = `
         CREATE TABLE IF NOT EXISTS transactions (
           id SERIAL PRIMARY KEY,
+          hash TEXT NOT NULL UNIQUE,
           contents JSONB NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -48,22 +49,56 @@ export class DatabaseService {
       client.release(); // 연결 해제
     }
   }
-
-  async saveTransaction(data: any): Promise<void> {
+  async findTransactionByHash(hash: string): Promise<any | null> {
     const client = await this.pool.connect();
     try {
       const query = `
-        INSERT INTO transactions (contents, created_at)
-        VALUES ($1, NOW())
+        SELECT *
+        FROM transactions
+        WHERE hash = $1
       `;
-      const values = [JSON.stringify(data.contents || data)];
-      await client.query(query, values);
-      console.log('Transaction saved successfully:', data.contents || data);
+      const values = [hash];
+      const result = await client.query(query, values);
+  
+      if (result.rows.length > 0) {
+        console.log('Transaction found:', result.rows[0]);
+        return result.rows[0]; // 첫 번째 매칭 결과 반환
+      } else {
+        console.log(`No transaction found for hash: ${hash}`);
+        return null; // 결과 없음
+      }
     } catch (err) {
-      console.error('Error saving data to PostgreSQL:', err);
+      console.error('Error finding transaction by hash:', err);
       throw err;
     } finally {
       client.release();
+    }
+  }
+  
+  async saveTransaction(data: any): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      const hash = data.txHash || data.hash;
+      // hash 값 유효성 검사
+    if (!hash) {
+        throw new Error('Hash value is missing. Cannot save transaction.');
+    }
+  
+    const query = `
+    INSERT INTO transactions (hash, contents, created_at)
+    VALUES ($1, $2, NOW())
+    ON CONFLICT (hash) DO NOTHING
+    `;
+
+    const values = [hash, JSON.stringify(data.contents || data)];
+    await client.query(query, values);
+
+    console.log('Transaction saved successfully:', hash);
+    } catch (err) {
+        console.error('Error saving data to PostgreSQL:', err);
+        throw err;
+    } finally {
+        client.release();
     }
   }
 }
