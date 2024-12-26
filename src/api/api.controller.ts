@@ -1,7 +1,7 @@
-import { Controller, Get, Query, HttpException, HttpStatus,Param,Res } from "@nestjs/common";
+import { Controller, Get, Query, HttpException, HttpStatus, Param, Res } from "@nestjs/common";
 import { ApiService } from "./api.service";
 import { Response } from 'express';
-import { CCTPapiError,LayerZeroError } from "src/errors";
+import { CCTPapiError, LayerZeroError, SquidapiError } from "src/errors";
 
 
 @Controller('/api')
@@ -34,12 +34,24 @@ export class ApiController {
     } catch (error) {
       if (error instanceof LayerZeroError) {
         console.error("LayerZero 에러 발생. CCTP api로 전환:", error.message);
-        const result = await this.getRecipientActivitiesFromCCTP(txHash);
-        return result;
-      } else if (error instanceof CCTPapiError) {
-        console.error("CCTP api 처리 실패. Range 크롤링 대체 수행:", error.message);
-        const result = await this.apiService.fetchAndParseHtml(txHash);
-        return result;
+        try {
+          const result = await this.getRecipientActivitiesFromCCTP(txHash);
+          return result;
+        } catch (cctpError) {
+          if (cctpError instanceof CCTPapiError) {
+            console.error("CCTP api 처리 실패. Squid api로 전환:", cctpError.message);
+            try {
+              const result = await this.apiService.fetchTransactionData(txHash);
+              return result;
+            } catch (squidError) {
+              console.error("Squid API 처리 실패. Range 크롤링으로 전환:", squidError.message);
+              if (squidError instanceof SquidapiError) {
+                const result = await this.apiService.fetchAndParseHtml(txHash);
+                return result;
+              }
+            }
+          }
+        }
       } else {
         console.error("알 수 없는 에러 발생:", error.message);
         throw error;
@@ -51,17 +63,18 @@ export class ApiController {
   private async getRecipientActivitiesFromCCTP(txHash: string) {
     try {
       const txInfo = await this.apiService.getTransactionInfoFromRange(txHash);
+
+      if (!txInfo || typeof txInfo.from_network === 'undefined') {
+        throw new CCTPapiError('Invalid txInfo or missing from_network property');
+      }
+
       return this.apiService.getRecipientTxListFromCCTP(txInfo);
     } catch (error) {
-      // 에러 메시지를 JSON으로 클라이언트에 반환
-      throw new HttpException(
-        {
-          success: false,
-          message: error.message,
-          error: error.stack // 스택 추적 정보를 추가
-        },
-        HttpStatus.BAD_REQUEST
-      );
+      // CCTPapiError 외의 에러를 SquidapiError로 감쌈
+      if (!(error instanceof CCTPapiError)) {
+        throw new SquidapiError('CCTP 처리 실패: ' + (error.message || 'Unknown error'));
+      }
+      throw error;
     }
   }
 
