@@ -393,7 +393,7 @@
         minimumFractionDigits: 0,
         maximumFractionDigits: 6
       });
-      if(protocol === 'CCTP'){
+      if(protocol === 'CCTP'|| protocol === 'Squid'){
         sourceValue = formatter.format(Number(sourceTx.value) / 1e6);
       }else{
         sourceValue = Number((Number(sourceTx.value) / 10**18).toFixed(4)).toLocaleString();
@@ -409,7 +409,7 @@
   `;
       // Create destination transaction details
       let destinationValue;
-      if(protocol === 'CCTP'){
+      if(protocol === 'CCTP'|| protocol === 'Squid'){
         destinationValue = formatter.format(Number(destinationTx.value) / 1e6);
       }else{
         destinationValue =  Number((Number(destinationTx.value) / 10**18).toFixed(4)).toLocaleString();
