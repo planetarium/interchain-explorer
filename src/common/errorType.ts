@@ -11,3 +11,10 @@ constructor(message: string) {
     this.name = "CCTPapiError";
 }
 }
+
+export class SquidapiError extends Error {
+  constructor(message: string) {
+      super(message);
+      this.name = "SquidapiError";
+}
+}

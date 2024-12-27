@@ -1,7 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, Transaction, TransactionDescription, TransactionReceipt } from "ethers";
+<<<<<<< HEAD
 import { catchError, firstValueFrom } from "rxjs";
+=======
+import { catchError, filter, firstValueFrom, take, map, defaultIfEmpty, mergeMap, toArray, from} from "rxjs";
+>>>>>>> 9404c283aeb683e40fae55d15d5fc96a1f5dcdd2
 import { AxiosError } from "axios";
 import { DatabaseService } from "./api.db.service.js";
 import { MethodMapperService } from "../common/method-mapper.service";
@@ -9,7 +13,7 @@ import { EventDictionary } from "../common/event.dictionary";
 import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { LayerZeroError, CCTPapiError } from '../errors';
+import { CCTPapiError,LayerZeroError } from "../common/errorType";
 import { USDC_ADDRESSES_MAP } from "../common/usdc-address";
 
 @Injectable()
@@ -727,19 +731,19 @@ export class ApiService {
     // 체인별로 URL과 체인명 설정
     switch (chain) {
       case 'bsc':
-        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BNBSCAN_API_KEY}`;
+        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BNBSCAN_API_KEY}`;
         chainName = 'bsc';
         break;
       case 'arbitrum':
-        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${ARBITRUM_API_KEY}`;
+        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${ARBITRUM_API_KEY}`;
         chainName = 'arbitrum';
         break;
       case 'ethereum':
-        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${ETHEREUM_API_KEY}`;
+        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${ETHEREUM_API_KEY}`;
         chainName = 'ethereum';
         break;
       case 'base':
-        url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&page=1&offset=5&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BASE_API_KEY}`;
+        url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BASE_API_KEY}`;
         chainName = 'base';
         break;
       default:
@@ -748,6 +752,12 @@ export class ApiService {
 
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
+        mergeMap((response: any) => from(response.data.result)), // response.data.result를 개별 요소로 변환
+        filter((tx: { from: string }) => tx.from.toLowerCase() === address.toLowerCase()),
+        take(5), // 부합하는 5개 값을 찾으면 종료
+        toArray(), // 배열로 변환
+        map((result: any[]) => ({ data: { result } })), // 원래 구조로 변환
+        defaultIfEmpty({ data: { result: [] } }), // 기본값 설정
         catchError((error: AxiosError) => {
           const errMsg = "Failed to fetch transaction history from " + chain + "\nMessage: " + error.message;
           console.log(errMsg);
@@ -756,13 +766,10 @@ export class ApiService {
       )
     );
 
-    for (const tx of data.result) {
-      tx.chain = chainName; // 구분을 위한 체인명 삽입
-    }
-    if (data.message === "OK") {
-      return data.result;
+    if (data.result.length > 0) {
+      return data.result.map((tx: any) => ({ ...tx, chain: chainName }));
     } else {
-      console.log(data.message);
+      console.log("No transactions afterwards on the destination chain.");
       return '';
     }
   }
@@ -1011,6 +1018,117 @@ export class ApiService {
     } catch (error: any) {
       console.error('Error fetching or parsing HTML:', error.message);
       return null;
+    }
+  }
+
+  // Squid API
+  async fetchTransactionData(txHash: string): Promise<any> {
+    if (!txHash) throw new Error('Transaction hash is required.');
+
+    const url = `https://api.0xsquid.com/v1/status?transactionId=${txHash}`;
+    try {
+      const { data } = await firstValueFrom(this.httpService.get(url).pipe(
+        catchError((error: AxiosError) => {
+          throw new Error(`Squid API fetch error: ${error.message}`);
+        })
+      ));
+      if (!data) throw new Error(`No transaction data found for hash: ${txHash}`);
+
+      const [fromChainInfo, toChainInfo] = await Promise.all(
+        ['fromChain', 'toChain'].map((chain) =>
+          this.fetchChainTransactionDetails(data[chain].chainData.chainName, data[chain].transactionId)
+        )
+      );
+
+      const formatTx = (chainData: any, txInfo: any, isSource: boolean) => ({
+        chain: chainData.chainName?.toLowerCase() || 'unknown',
+        address: isSource
+          ? chainData.squidContracts?.squidRouter || 'unknown'
+          : chainData.squidContracts?.defaultCrosschainToken || 'unknown',
+        value: txInfo.sendValue || txInfo.receiveValue || '0',
+        hash: txInfo.hash,
+        timestamp: txInfo.timestamp,
+        id: 'USDC',
+      });
+
+      return [
+        {
+          protocol: 'Squid',
+          sourceTx: formatTx(data.fromChain.chainData, fromChainInfo, true),
+          destinationTx: formatTx(data.toChain.chainData, toChainInfo, false),
+        },
+      ];
+    } catch (error) {
+      console.error(`Error in fetchTransactionData for hash: ${txHash}`, error);
+      throw error;
+    }
+  }
+
+  // 트랜잭션 로그를 필터링하고 송신 및 수신 값을 추출
+  private async getUsdcTransferLogs(chain: string, recipientAddress: string, depositorAddress: string, logs: any) {
+    const transferCode = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const relevantLogs = logs.filter((log: any) => log.topics[0] === transferCode);
+    return relevantLogs.reduce(
+      (result, log) => {
+        const sender = '0x' + log.topics[1].slice(-40).toLowerCase();
+        const receiver = '0x' + log.topics[2].slice(-40).toLowerCase();
+        if (sender === depositorAddress.toLowerCase()) result.sendValue = BigInt(parseInt(log.data, 16)).toString();
+        if (receiver === recipientAddress.toLowerCase()) result.receiveValue = BigInt(parseInt(log.data, 16)).toString();
+        return result;
+      },
+      { sendValue: null, receiveValue: null }
+    );
+  }
+
+  // 체인별 트랜잭션 세부 정보
+  private async fetchChainTransactionDetails(chainName: string, transactionId: string): Promise<any> {
+    const chainApiMap = {
+      ethereum: `https://api.etherscan.io/api?module=proxy&action=eth_getTransactionReceipt&txhash=${transactionId}&apikey=${ETHEREUM_API_KEY}`,
+      arbitrum: `https://api.arbiscan.io/api?module=proxy&action=eth_getTransactionReceipt&txhash=${transactionId}&apikey=${ARBITRUM_API_KEY}`,
+      base: `https://api.basescan.org/api?module=proxy&action=eth_getTransactionReceipt&txhash=${transactionId}&apikey=${BASE_API_KEY}`,
+    };
+
+    const apiUrl = chainApiMap[chainName.toLowerCase()];
+    if (!apiUrl) throw new Error(`Unsupported chain: ${chainName}`);
+
+    try {
+      const response = await axios.get(apiUrl);
+      const tx = response.data?.result;
+      if (!tx?.logs) return { sendValue: '0', receiveValue: '0', hash: transactionId, timestamp: 0 };
+
+      const blockTimestamp = await this.fetchBlockTimestamp(chainName, tx.blockNumber);
+      const receipt = await this.getTxReceipt(transactionId, chainName.toLowerCase());
+
+      const { sendValue, receiveValue } = await this.getUsdcTransferLogs(
+        chainName.toLowerCase(),
+        tx.to.toLowerCase(),
+        tx.to.toLowerCase(),
+        receipt.logs
+      );
+
+      return { sendValue: sendValue || '0', receiveValue: receiveValue || '0', hash: transactionId, timestamp: blockTimestamp };
+    } catch (error) {
+      console.error(`Error fetching transaction details for ${transactionId} on ${chainName}`, error);
+      return { sendValue: '0', receiveValue: '0', hash: transactionId, timestamp: 0 };
+    }
+  }
+
+  private async fetchBlockTimestamp(chainName: string, blockNumber: string): Promise<number> {
+    const chainApiMap = {
+      ethereum: `https://api.etherscan.io/api?module=block&action=getblockreward&blockno=${parseInt(blockNumber, 16)}&apikey=${ETHEREUM_API_KEY}`,
+      arbitrum: `https://api.arbiscan.io/api?module=block&action=getblockreward&blockno=${parseInt(blockNumber, 16)}&apikey=${ARBITRUM_API_KEY}`,
+      base: `https://api.basescan.org/api?module=block&action=getblockreward&blockno=${parseInt(blockNumber, 16)}&apikey=${BASE_API_KEY}`,
+    };
+
+    const apiUrl = chainApiMap[chainName.toLowerCase()];
+    if (!apiUrl) throw new Error(`Unsupported chain: ${chainName}`);
+
+    try {
+      const response = await axios.get(apiUrl);
+      return response.data?.result?.timeStamp ? parseInt(response.data.result.timeStamp) * 1000 : 0;
+    } catch (error) {
+      console.error(`Error fetching block timestamp for ${blockNumber} on ${chainName}`, error);
+      return 0;
     }
   }
 }
