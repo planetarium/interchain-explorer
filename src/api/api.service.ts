@@ -8,7 +8,7 @@ import { EventDictionary } from "../common/event.dictionary";
 import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { LayerZeroError, CCTPapiError } from '../errors';
+import { LayerZeroError, CCTPapiError } from '../common/errorType';
 import { USDC_ADDRESSES_MAP } from "../common/usdc-address";
 
 @Injectable()
