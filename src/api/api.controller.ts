@@ -1,7 +1,7 @@
 import { Controller, Get, Query, HttpException, HttpStatus, Param, Res } from "@nestjs/common";
 import { ApiService } from "./api.service";
 import { Response } from 'express';
-import { CCTPapiError, LayerZeroError, SquidapiError } from "src/errors";
+import { CCTPapiError,LayerZeroError, SquidapiError} from "../common/errorType";
 
 
 @Controller('/api')
