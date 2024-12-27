@@ -63,11 +63,6 @@ export class ApiController {
   private async getRecipientActivitiesFromCCTP(txHash: string) {
     try {
       const txInfo = await this.apiService.getTransactionInfoFromRange(txHash);
-
-      if (!txInfo || typeof txInfo.from_network === 'undefined') {
-        throw new CCTPapiError('Invalid txInfo or missing from_network property');
-      }
-
       return this.apiService.getRecipientTxListFromCCTP(txInfo);
     } catch (error) {
       // CCTPapiError 외의 에러를 SquidapiError로 감쌈

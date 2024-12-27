@@ -806,7 +806,7 @@ export class ApiService {
   }
 
   async getTransactionInfoFromRange(txHash: string) {
-    const url = 'https://usdc.range.org/usdc/api/transfers';
+    const url = `https://usdc.range.org/usdc/api/transfers`;
     const { data } = await firstValueFrom(
       this.httpService.get(url, {
         params: {
@@ -828,6 +828,11 @@ export class ApiService {
         })
       )
     );
+    if (!data || data.resources.length === 0) {
+      const errMsg = "No data found in Range API for transaction";
+      console.error(errMsg);
+      throw new CCTPapiError(errMsg);
+    }
     return data.resources[0];
   }
 
