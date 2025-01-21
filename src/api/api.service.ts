@@ -19,10 +19,6 @@ export class ApiService {
   private bnbProvider = new EtherscanProvider('bnb', BNBSCAN_API_KEY);
   private arbitrumProvider = new InfuraProvider('arbitrum', INFURA_API_KEY);
   private baseProvider = new InfuraProvider('base', INFURA_API_KEY);
-  private mainnetUrl = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`;
-  private bnbUrl = `https://bsc-mainnet.infura.io/v3/${INFURA_API_KEY}`;
-  private arbiUrl = `https://arbitrum-mainnet.infura.io/v3/${INFURA_API_KEY}`;
-  private baseUrl = `https://base-mainnet.infura.io/v3/${INFURA_API_KEY}`;
 
   constructor(
     private readonly httpService: HttpService,
@@ -581,14 +577,7 @@ export class ApiService {
       id: 1
     };
 
-    let url = this.mainnetUrl;
-    if(chain === 'bsc')
-      url = this.bnbUrl;
-    else if(chain === 'arbitrum')
-      url = this.arbiUrl;
-    else if (chain === "base")
-      url = this.baseUrl;
-
+    const url = this.chainService.getRpcUrl(chain as ChainType);
     const { data } = await firstValueFrom(
       this.httpService.post(url, requestBody).pipe(
         catchError((error: AxiosError) => {
@@ -671,31 +660,7 @@ export class ApiService {
     if (address.length > 40)
       address = "0x" + address.slice(-40);
 
-    let url = '';
-    let chainName = '';
-
-    // 체인별로 URL과 체인명 설정
-    switch (chain) {
-      case 'bsc':
-        url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BNBSCAN_API_KEY}`;
-        chainName = 'bsc';
-        break;
-      case 'arbitrum':
-        url = `https://api.arbiscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=latest&apikey=${ARBITRUM_API_KEY}`;
-        chainName = 'arbitrum';
-        break;
-      case 'ethereum':
-        url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${ETHEREUM_API_KEY}`;
-        chainName = 'ethereum';
-        break;
-      case 'base':
-        url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999&apikey=${BASE_API_KEY}`;
-        chainName = 'base';
-        break;
-      default:
-        throw new Error("Unsupported chain");
-    }
-
+    const url = this.chainService.getExplorerApiUrl(chain as ChainType) + `&module=account&action=txlist&address=${address}&page=1&offset=50&sort=asc&startblock=${blockNumber}&endblock=99999999`;
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         mergeMap((response: any) => from(response.data.result)), // response.data.result를 개별 요소로 변환
@@ -713,7 +678,7 @@ export class ApiService {
     );
 
     if (data.result.length > 0) {
-      return data.result.map((tx: any) => ({ ...tx, chain: chainName }));
+      return data.result.map((tx: any) => ({ ...tx, chain: chain }));
     } else {
       console.log("No transactions afterwards on the destination chain.");
       return '';
@@ -1035,14 +1000,7 @@ export class ApiService {
 
   // 체인별 트랜잭션 세부 정보
   private async fetchChainTransactionDetails(chainName: string, transactionId: string): Promise<any> {
-    const chainApiMap = {
-      ethereum: `https://api.etherscan.io/api?module=proxy&action=eth_getTransactionReceipt&txhash=${transactionId}&apikey=${ETHEREUM_API_KEY}`,
-      arbitrum: `https://api.arbiscan.io/api?module=proxy&action=eth_getTransactionReceipt&txhash=${transactionId}&apikey=${ARBITRUM_API_KEY}`,
-      base: `https://api.basescan.org/api?module=proxy&action=eth_getTransactionReceipt&txhash=${transactionId}&apikey=${BASE_API_KEY}`,
-    };
-
-    const apiUrl = chainApiMap[chainName.toLowerCase()];
-    if (!apiUrl) throw new Error(`Unsupported chain: ${chainName}`);
+    const apiUrl = this.chainService.getExplorerApiUrl(chainName as ChainType) + `&module=proxy&action=eth_getTransactionReceipt&txhash=${transactionId}`;
 
     try {
       const response = await axios.get(apiUrl);
@@ -1067,14 +1025,7 @@ export class ApiService {
   }
 
   private async fetchBlockTimestamp(chainName: string, blockNumber: string): Promise<number> {
-    const chainApiMap = {
-      ethereum: `https://api.etherscan.io/api?module=block&action=getblockreward&blockno=${parseInt(blockNumber, 16)}&apikey=${ETHEREUM_API_KEY}`,
-      arbitrum: `https://api.arbiscan.io/api?module=block&action=getblockreward&blockno=${parseInt(blockNumber, 16)}&apikey=${ARBITRUM_API_KEY}`,
-      base: `https://api.basescan.org/api?module=block&action=getblockreward&blockno=${parseInt(blockNumber, 16)}&apikey=${BASE_API_KEY}`,
-    };
-
-    const apiUrl = chainApiMap[chainName.toLowerCase()];
-    if (!apiUrl) throw new Error(`Unsupported chain: ${chainName}`);
+    const apiUrl = this.chainService.getExplorerApiUrl(chainName as ChainType) + `&module=block&action=getblockreward&blockno=${parseInt(blockNumber, 16)}`;
 
     try {
       const response = await axios.get(apiUrl);
