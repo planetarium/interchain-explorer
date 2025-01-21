@@ -7,9 +7,11 @@ import { MethodMapperService } from "../common/method-mapper.service";
 import { EventDictionary } from "../common/event.dictionary";
 import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
 import axios from 'axios';
-import * as cheerio from 'cheerio';
+import cheerio from 'cheerio';
 import { CCTPapiError,LayerZeroError } from "../common/errorType";
 import { USDC_ADDRESSES_MAP } from "../common/usdc-address";
+import { ChainService } from './chain.service';
+import { TransactionResponse, ChainType, TokenInfo } from './interfaces';
 
 @Injectable()
 export class ApiService {
@@ -24,7 +26,8 @@ export class ApiService {
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly methodMapperService: MethodMapperService
+    private readonly methodMapperService: MethodMapperService,
+    private readonly chainService: ChainService
   ) {}
 
   async selectSrcTxAndGetMethodName(srcTxHash: string, sourceChain: string) { // 무슨 메서드를 실행시켰는지 알아내기 (OFT 송금, Claim, Airdrop ...)
@@ -364,7 +367,7 @@ export class ApiService {
       "timestamp": srcTimeStamp, "hash": srcTxHash};
     const destinationTx = {"address":recipientAddress, "id": tokenSymbol, "name":tokenName, "chain": chain, "value": outputAmount.toString()};
     const { transactionGroups, tokenGroups } = await this.makeResponseGroups(chain, recipientAddress, await this.getBlockNumberByTimeStamp(timeStamp));
-    const response = this.makeResponse("Across", sourceTx, destinationTx, transactionGroups, tokenGroups);
+    const response = this.makeResponse("Across", sourceTx as TransactionResponse, destinationTx as TransactionResponse, transactionGroups, tokenGroups);
     console.log(response)
     return response;
   }
@@ -432,20 +435,31 @@ export class ApiService {
     return data.data[0];
   }
 
-  private async getTokenInfo(tokenAddress: string, provider: Provider) {
-    if(tokenAddress === '0x0000000000000000000000000000000000000000')
+  private async getTokenInfo(tokenAddress: string, provider: Provider): Promise<TokenInfo> {
+    if (tokenAddress === '0x0000000000000000000000000000000000000000') {
       return { tokenName: 'unknown', tokenSymbol: 'unknown' };
-    else if(tokenAddress === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
+    }
+    if (tokenAddress === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee') {
       return { tokenName: 'ETH', tokenSymbol: 'ETH' };
-    try {
-      const tokenContract = new Contract(tokenAddress, ["function name() view returns (string)", "function symbol() view returns (string)"], provider);
-      const tokenName = await tokenContract.name();
-      const tokenSymbol = await tokenContract.symbol();
-      return { tokenName, tokenSymbol };
-    } catch (e) {
-      return { tokenName: 'unknown', tokenSymbol: 'unknown' }
     }
 
+    try {
+      const tokenContract = new Contract(
+        tokenAddress,
+        ["function name() view returns (string)", "function symbol() view returns (string)"],
+        provider
+      );
+      
+      const [tokenName, tokenSymbol] = await Promise.all([
+        tokenContract.name(),
+        tokenContract.symbol()
+      ]);
+      
+      return { tokenName, tokenSymbol };
+    } catch (e) {
+      console.error(`Failed to fetch token info for address ${tokenAddress}:`, e);
+      return { tokenName: 'unknown', tokenSymbol: 'unknown' };
+    }
   }
 
   private async getDecodedInputData(abi, srcTxHash: string, sourceProvider: Provider) {
@@ -521,13 +535,7 @@ export class ApiService {
       id: 1
     };
 
-    let url = this.mainnetUrl;
-    if(chain === 'bsc')
-      url = this.bnbUrl;
-    else if(chain === 'arbitrum')
-      url = this.arbiUrl;
-    else if(chain === 'base')
-      url = this.baseUrl;
+    const url = this.chainService.getRpcUrl(chain as ChainType);
 
     const { data } = await firstValueFrom(
       this.httpService.post(url, requestBody).pipe(
@@ -541,32 +549,28 @@ export class ApiService {
     return data.result;
   }
 
-  private async getTxReceipt(txHash: string, chain?: string): Promise<null | TransactionReceipt>{
+  private async getTxReceipt(txHash: string, chain?: ChainType): Promise<TransactionReceipt | null> {
     const requestBody = {
       jsonrpc: "2.0",
       method: "eth_getTransactionReceipt",
-      params: [`${txHash}`],
+      params: [txHash],
       id: 1
     };
 
-    let url = this.mainnetUrl;
-    if(chain === 'bsc')
-      url = this.bnbUrl;
-    else if(chain === 'arbitrum')
-      url = this.arbiUrl;
-    else if (chain === "base")
-      url = this.baseUrl;
-
-    const { data } = await firstValueFrom(
-      this.httpService.post(url, requestBody).pipe(
-        catchError((error: AxiosError) => {
-          const errMsg = "Failed to fetch transaction history from " + chain + " RPC\nMessage: " + error.message;
-          console.log(errMsg);
-          throw new Error(errMsg);
-        })
-      )
-    );
-    return data.result;
+    try {
+      const url = this.chainService.getRpcUrl(chain);
+      const { data } = await firstValueFrom(
+        this.httpService.post(url, requestBody).pipe(
+          catchError((error: AxiosError) => {
+            throw new Error(`Failed to fetch transaction receipt from ${chain} RPC: ${error.message}`);
+          })
+        )
+      );
+      return data.result;
+    } catch (error) {
+      console.error(`Error fetching transaction receipt:`, error);
+      throw error;
+    }
   }
 
   private async getTimeStamp(blockNumber: string, chain: string){
@@ -732,7 +736,7 @@ export class ApiService {
     return "0";
   }
 
-  private selectProvider(chain: string) {
+  private selectProvider(chain: ChainType): Provider {
     let provider: Provider;
     if (chain === "bsc")
       provider = this.bnbProvider;
@@ -746,7 +750,7 @@ export class ApiService {
   }
 
   async makeResponseGroups(chain: string, recipientAddress: string, blockNumber: number) {
-    const provider = this.selectProvider(chain);
+    const provider = this.selectProvider(chain as ChainType);
     const [transactions, tokens] = await Promise.all([
       this.getTxListByAddress(recipientAddress, String(blockNumber), chain),
       []
@@ -784,16 +788,20 @@ export class ApiService {
     return { transactionGroups, tokenGroups };
   }
 
-  private makeResponse(protocol, sourceTx, destinationTx, transactionGroups, tokenGroups) {
-    const response = [];
-    response.push({
-      "protocol": protocol,
-      "sourceTx": sourceTx,
-      "destinationTx": destinationTx,
-      "transactionGroups": transactionGroups,
-      "tokenGroups": tokenGroups
-    });
-    return response;
+  private makeResponse(
+    protocol: string,
+    sourceTx: TransactionResponse,
+    destinationTx: TransactionResponse,
+    transactionGroups: any[],
+    tokenGroups: any[]
+  ): any[] {
+    return [{
+      protocol,
+      sourceTx,
+      destinationTx,
+      transactionGroups,
+      tokenGroups
+    }];
   }
 
   private getMethodId(srcTx) {
@@ -889,8 +897,6 @@ export class ApiService {
       const response = await axios.get(url);
       const html: string = response.data;
       const $ = cheerio.load(html);
-      //console.log($.html());
-      //console.log($('script'));
       const scriptTags = $('script').toArray();
       let jsonData = null;
       for (const el of scriptTags) {
@@ -1044,10 +1050,10 @@ export class ApiService {
       if (!tx?.logs) return { sendValue: '0', receiveValue: '0', hash: transactionId, timestamp: 0 };
 
       const blockTimestamp = await this.fetchBlockTimestamp(chainName, tx.blockNumber);
-      const receipt = await this.getTxReceipt(transactionId, chainName.toLowerCase());
+      const receipt = await this.getTxReceipt(transactionId, chainName.toLowerCase() as ChainType);
 
       const { sendValue, receiveValue } = await this.getUsdcTransferLogs(
-        chainName.toLowerCase(),
+        chainName.toLowerCase() as ChainType,
         tx.to.toLowerCase(),
         tx.to.toLowerCase(),
         receipt.logs

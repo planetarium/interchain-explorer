@@ -7,6 +7,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from 'path';
 import { MethodMapperService } from "../common/method-mapper.service";
+import { ChainService } from './chain.service';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { MethodMapperService } from "../common/method-mapper.service";
     }),
   ],
   controllers: [ApiController],
-  providers: [ApiService, MethodMapperService],
+  providers: [ApiService, ChainService, MethodMapperService],
   exports: [ApiService]
 })
 export class ApiModule {}
