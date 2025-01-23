@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
-import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, Transaction, TransactionDescription, TransactionReceipt } from "ethers";
+import { Contract, ethers, EtherscanProvider, InfuraProvider, Provider, TransactionDescription, TransactionReceipt } from "ethers";
 import { catchError, filter, firstValueFrom, take, map, defaultIfEmpty, mergeMap, toArray, from} from "rxjs";
 import { AxiosError } from "axios";
 import { MethodMapperService } from "../common/method-mapper.service";
 import { EventDictionary } from "../common/event.dictionary";
-import { ETHEREUM_API_KEY, BNBSCAN_API_KEY, INFURA_API_KEY, ARBITRUM_API_KEY, BASE_API_KEY} from "../constants/environment";
+import { BNBSCAN_API_KEY, INFURA_API_KEY} from "../constants/environment";
 import axios from 'axios';
 import cheerio from 'cheerio';
 import { CCTPapiError,LayerZeroError } from "../common/errorType";
@@ -170,7 +170,6 @@ export class ApiService {
   }
 
   async getRecipientTxListFromClaim(layerData) { //src: 로그 / dest: 로그
-    const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const depositorAddress = layerData.source.tx.from;
@@ -199,7 +198,6 @@ export class ApiService {
   }
 
   async getRecipientTxListFromLayerZero(layerData) { //src: 커스텀 로그 / dest: 커스텀 로그
-    const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const depositorAddress = layerData.source.tx.from;
@@ -229,7 +227,6 @@ export class ApiService {
   }
 
   async getRecipientTxListFromDrive(layerData) { //src: 로그 / dest: 로그
-    const sourceProvider = this.selectProvider(layerData.pathway.sender.chain);
     const destinationProvider = this.selectProvider(layerData.pathway.receiver.chain);
 
     const srcTx = await this.getTx(layerData.source.tx.txHash, layerData.pathway.sender.chain);
@@ -500,16 +497,8 @@ export class ApiService {
 
 
   private async getContractABI(srcTx, chain: string) {
-    let url = '';
-    if (chain === "bsc")
-      url = `https://api.bscscan.com/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${BNBSCAN_API_KEY}`;
-    else if (chain === "arbitrum")
-      url = `https://api.arbiscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${ARBITRUM_API_KEY}`;
-    else if (chain === "ethereum")
-      url = `https://api.etherscan.io/api?module=contract&action=getabi&address=${srcTx.to}&apikey=${ETHEREUM_API_KEY}`;
-    else {
-      throw new Error("Unsupported chain");
-    }
+    const url = this.chainService.getExplorerApiUrl(chain as ChainType) + `&module=contract&action=getabi&address=${srcTx.to}`;
+    
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
@@ -686,7 +675,8 @@ export class ApiService {
   }
 
   private async getBlockNumberByTimeStamp(timeStamp: string) {
-    const url = `https://api.arbiscan.io/api?module=block&action=getblocknobytime&timestamp=${timeStamp}&closest=after&apikey=YourApiKeyToken`
+    // need to figure out why it's using arbiscan api
+    const url = this.chainService.getExplorerApiUrl('arbitrum') + `&module=block&action=getblocknobytime&timestamp=${timeStamp}&closest=after`
     const { data } = await firstValueFrom(
       this.httpService.get(url).pipe(
         catchError((error: AxiosError) => {
